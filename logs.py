@@ -30,7 +30,6 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
     cont    = True
     text    = ""
-    mo      = None
     line    = ""
 
     # there is a line break bug in some logs, "\n\r" is used instead of
@@ -38,7 +37,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
     # as line break. We end up with some empty lines then as "\n\r" is
     # taken as two line breaks.
 
-    while cont:
+    while True:
 
         # readline() will return a string, which is terminated by "\n" for
         # every line. For the last line of the file my may return a string
@@ -55,14 +54,14 @@ def get_match_in_line(f, regex, timeout_sec=0):
         if line.endswith("\n"):
             text += line
             mo = regex.search(line)
+            if mo: return (text, mo.group(0))
             line = ""
 
         # timout=0 mean there is no timeout
-        cont = ((mo is None) and
-                    (timeout_sec == 0 or (time.time() - start <= timeout_sec)))
+        if ((timeout_sec != 0) and (time.time() - start > timeout_sec)):
+            return (text, None)
 
-    match = mo.group(0) if mo is not None else None
-    return (text, match)
+
 
 def open_file_non_blocking(file_name, mode, newline=None):
     """ Opens a file and set non blocking OS flag
