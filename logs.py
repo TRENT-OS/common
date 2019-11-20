@@ -64,7 +64,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
     match = mo.group(0) if mo is not None else None
     return (text, match)
 
-def open_file_non_blocking(file_name, mode, nl='\r\n'):
+def open_file_non_blocking(file_name, mode, newline=None):
     """ Opens a file and set non blocking OS flag
 
     Args:
@@ -77,7 +77,7 @@ def open_file_non_blocking(file_name, mode, nl='\r\n'):
 
     """
 
-    f = open(file_name, mode, newline=nl)
+    f = open(file_name, mode, newline=newline)
     fd = f.fileno()
     flag = fcntl.fcntl(fd, fcntl.F_GETFL)
     fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
