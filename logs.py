@@ -52,7 +52,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
         #  loop iteration n+2                         | line+\n |
 
         line += f.readline()
-        if line.find("\n") >= 0:
+        if line.endswith("\n"):
             text += line
             mo = regex.search(line)
             line = ""
