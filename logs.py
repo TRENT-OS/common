@@ -18,7 +18,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
     regex(Pattern): a compiled regular expression to look for
-    timeout_sec(int, optional): timeoiut in seconds, 0 means forever
+    timeout_sec(int, optional): timeout in seconds, 0 means forever
 
     Returns:
     text(str): the text from the begin of the search until the first match or the end
