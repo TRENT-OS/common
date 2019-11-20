@@ -51,7 +51,8 @@ def get_match_in_line(f, regex, timeout_sec=0):
         #  loop iteration n+2                         | line+\n |
 
         line += f.readline()
-        if line.endswith("\n"):
+        is_complete_line = line.endswith("\n")
+        if is_complete_line:
             text += line
             mo = regex.search(line)
             if mo: return (text, mo.group(0))
@@ -61,6 +62,10 @@ def get_match_in_line(f, regex, timeout_sec=0):
         if ((timeout_sec != 0) and (time.time() - start > timeout_sec)):
             return (text, None)
 
+        if not is_complete_line:
+            # we have eached the end of the file, wait a bit and then check
+            # again if new data has bee appended to the file
+            time.sleep(0.5)
 
 
 def open_file_non_blocking(file_name, mode, newline=None):
