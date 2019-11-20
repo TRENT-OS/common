@@ -33,12 +33,31 @@ def get_match_in_line(f, regex, timeout_sec=0):
     mo      = None
     line    = ""
 
+    # there is a line break bug in some logs, "\n\r" is used instead of
+    # "\r\n"- Universal newline handling accepts "\r", "\n" and "\r\n"
+    # as line break. We end up with some empty lines then as "\n\r" is
+    # taken as two line breaks.
+
     while cont:
+
+        # readline() will return a string, which is terminated by "\n" for
+        # every line. For the last line of the file my may return a string
+        # that is not termiated by "\n" to indicate the end of the file. If
+        # another task mis appending data to the file, readline() may return
+        # multiple string without "\n", each containing the new data writtem
+        # to the file.
+        #
+        #  loop iteration n:  | line part |...
+        #  loop iteration n+1             | line part |...
+        #  loop iteration n+2                         | line+\n |
+
         line += f.readline()
         if line.find("\n") >= 0:
             text += line
             mo = regex.search(line)
             line = ""
+
+        # timout=0 mean there is no timeout
         cont = ((mo is None) and
                     (timeout_sec == 0 or (time.time() - start <= timeout_sec)))
 
