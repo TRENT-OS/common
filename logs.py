@@ -30,7 +30,6 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
     start   = time.time()
 
-    cont    = True
     text    = ""
     line    = ""
 
