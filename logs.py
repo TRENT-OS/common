@@ -41,9 +41,9 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
         # readline() will return a string, which is terminated by "\n" for
         # every line. For the last line of the file my may return a string
-        # that is not termiated by "\n" to indicate the end of the file. If
-        # another task mis appending data to the file, readline() may return
-        # multiple string without "\n", each containing the new data writtem
+        # that is not terminated by "\n" to indicate the end of the file. If
+        # another task is appending data to the file, readline() may return
+        # multiple strings without "\n", each containing the new data written
         # to the file.
         #
         #  loop iteration n:  | line part |...
