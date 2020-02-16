@@ -1,10 +1,10 @@
-""" Logs parser
+"""
+Logs parser
 
 This module allows the user to parse a log searching in it in a way that is
 useful for testing. Such operations like looking for a regex match are
 performed "online" on the log until the match condition happens or a timeout
 occurred
-
 """
 
 import time
@@ -12,8 +12,11 @@ import re
 import fcntl
 import os
 
+
+#------------------------------------------------------------------------------
 def get_match_in_line(f, regex, timeout_sec=0):
-    """ Gets the first regex match in a text file parsing it line by line.
+    """
+    Gets the first regex match in a text file parsing it line by line.
 
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
@@ -23,7 +26,6 @@ def get_match_in_line(f, regex, timeout_sec=0):
     Returns:
     text(str): the text from the begin of the search until the first match or the end
     match(str): the matching string
-
     """
 
     start   = time.time()
@@ -68,8 +70,10 @@ def get_match_in_line(f, regex, timeout_sec=0):
             time.sleep(0.5)
 
 
+#------------------------------------------------------------------------------
 def open_file_non_blocking(file_name, mode, newline=None):
-    """ Opens a file and set non blocking OS flag
+    """
+    Opens a file and set non blocking OS flag
 
     Args:
     file_name(str): the file full path
@@ -78,7 +82,6 @@ def open_file_non_blocking(file_name, mode, newline=None):
 
     Returns:
     f(file): the file object
-
     """
 
     f = open(file_name, mode, newline=newline)
