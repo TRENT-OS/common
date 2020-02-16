@@ -14,6 +14,29 @@ import os
 
 
 #------------------------------------------------------------------------------
+def open_file_non_blocking(file_name, mode, newline=None):
+    """
+    Opens a file and set non blocking OS flag
+
+    Args:
+    file_name(str): the file full path
+    mode: mode to pass to open()
+    nl(str, optional): newline
+
+    Returns:
+    f(file): the file object
+    """
+
+    f = open(file_name, mode, newline=newline)
+    fd = f.fileno()
+    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
+    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
+
+    return f
+
+
+#------------------------------------------------------------------------------
 def get_match_in_line(f, regex, timeout_sec=0):
     """
     Gets the first regex match in a text file parsing it line by line.
@@ -67,27 +90,3 @@ def get_match_in_line(f, regex, timeout_sec=0):
             # we have eached the end of the file, wait a bit and then check
             # again if new data has bee appended to the file
             time.sleep(0.5)
-
-
-#------------------------------------------------------------------------------
-def open_file_non_blocking(file_name, mode, newline=None):
-    """
-    Opens a file and set non blocking OS flag
-
-    Args:
-    file_name(str): the file full path
-    mode: mode to pass to open()
-    nl(str, optional): newline
-
-    Returns:
-    f(file): the file object
-    """
-
-    f = open(file_name, mode, newline=newline)
-    fd = f.fileno()
-    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
-    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-
-    return f
-
