@@ -111,6 +111,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
     match(str): the matching string
     """
 
+    regex_compiled = re.compile( regex )
     time_end = time.time() + timeout_sec
     text    = ""
 
@@ -127,6 +128,95 @@ def get_match_in_line(f, regex, timeout_sec=0):
             return (text, None)
 
         text += line
-        mo = regex.search(line)
+        mo = regex_compiled.search(line)
         if mo:
             return (text, mo.group(0))
+
+
+#-------------------------------------------------------------------------------
+def check_log_match_sequence(f, expr_array, timeout_sec=0):
+    """
+    Takes an array of regular expressions and perform the simple test. The
+    order of the elements in the array matters, must be the same order in the
+    log file
+
+    Args:
+    f(file): the file handler of the log (shall be opened for non-blocking op)
+    expr_array: array with strings to match
+    timeout_sec(int, optional): timeout in seconds, 0 means disabled
+    """
+
+    text = ""
+    time_end = time.time() + timeout_sec
+
+    for expr in expr_array:
+
+        new_timeout = get_remaining_timeout_or_zero(time_end)
+
+        (text_part, match) = get_match_in_line(f, re.escape(expr), timeout_sec)
+        text += text_part
+        if match is None:
+            print("No match for '%s'" % expr)
+            return (False, text, expr)
+
+        # we don't support any wildcards for now
+        assert(match == expr)
+
+    return (True, text, None)
+
+
+#-------------------------------------------------------------------------------
+def check_log_match_set(f, expr_array, timeout_sec=0):
+    """
+    Take an array of regular expressions and perform the simple test. The order
+    of the elements in the array does not matter, the matches just have to be
+    there in the log occurring at any time at the least once per single
+    expression
+
+    Args:
+    f(file): the file handler of the log (shall be opened for non-blocking op)
+    expr_array: array with strings to match
+    timeout_sec(int, optional): timeout in seconds, 0 means disabled
+    """
+
+    expr_dict = {}
+    for expr in expr_array:
+        expr_dict[expr] = re.compile( re.escape(expr) )
+
+    text = ""
+    time_end = time.time() + timeout_sec
+
+    while True:
+
+        # timeouts apply only, when a function would block, we don't want to
+        # fail if there is data, but we've run out of time. Thus we set the
+        # timeout to 0 if we have run out of time, so any blocking would lead
+        # to an error.
+        new_timeout = get_remaining_timeout_or_zero(time_end)
+        line = read_line_from_log_file_with_timeout(f, new_timeout)
+        if line is None:
+            print("timeout waiting for next line (%d byte read)"%(len(text)))
+            return (False, text, expr_dict.keys())
+
+        text += line
+
+        # we can't modify the dictionary while iterating over it, thus we
+        # create a list of itmes to remove
+        remove_expr = [];
+        for expr in expr_dict:
+            regex_compiled = expr_dict[expr]
+            mo = regex_compiled.search(line)
+            if not mo:
+                continue
+
+            match = mo.group(0)
+            assert(match == expr) # we don't support any wildcards for now
+            remove_expr.append(expr)
+
+        # remove expression we have found
+        if remove_expr:
+            for expr in remove_expr:
+                expr_dict.pop(expr)
+
+            if not expr_dict:
+                return (True, text, None)
