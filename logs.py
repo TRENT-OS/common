@@ -220,3 +220,54 @@ def check_log_match_set(f, expr_array, timeout_sec=0):
 
             if not expr_dict:
                 return (True, text, None)
+
+
+#-------------------------------------------------------------------------------
+def find_assert(f):
+    """
+    Check if current output already contains an assert failure of any type.
+    Start at the beginning and ensure that we set the file cursor back.
+    """
+
+    assert_re = re.compile(r'Assertion failed: \@(.*)\((.*)\): (.*)\n')
+
+    f.seek(0,0)
+
+    (text, match) = get_match_in_line(f, assert_re)
+
+    f.seek(0,0)
+
+    return match
+
+
+#-------------------------------------------------------------------------------
+def check_result_or_assert(f, test_fn, test_args, timeout=0):
+    """
+    Wait for a test result string or an assert specific to a test function
+    appears in the output file.
+    """
+
+    test_name = test_fn if test_args is None \
+                else "%s(%s)" % (test_fn, test_args)
+
+    assert_re = re.compile(r'Assertion failed: @%s: (.*)\n' % re.escape(test_name))
+    result_re = re.compile(r'!!! %s: OK\n' % re.escape(test_name))
+
+    stop_time = time.time() + timeout
+    line = ""
+
+    while True:
+        new_timeout = get_remaining_timeout_or_zero(stop_time)
+        line = read_line_from_log_file_with_timeout(f, new_timeout)
+        if line is None:
+            return (False, None)
+
+        mo = result_re.search(line)
+        if mo is not None:
+            return (True, None)
+
+        mo = assert_re.search(line)
+        if mo is not None:
+            return (False, mo.group(1))
+
+        line = ""
