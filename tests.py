@@ -1,59 +1,56 @@
-import time
+import time, re
 import logs
-import re
 
-def assert_log_match(regex, log, timeout=0):
-    """asserts the existence of a regex in a line of the log file and return the
-    tuple (text, match) where the match is the text matching the expression and
-    text is the log file content until the encountered match"""
 
-    (text, match) = logs.get_match_in_line(log, re.compile(regex), timeout)
-    assert re.escape(match) == regex
-
-    return (text, match)
-
-def run_test_log_match(fixture, test_system, expr, timeout=0):
-    """performs the simplest test by getting the log file from the fixture and
-    then assert the match of the regular expression in a line of the log"""
-
-    test_run = fixture(test_system)
-    f_out = test_run[1]
-
-    return assert_log_match(re.escape(expr), f_out, timeout)
-
-def run_test_log_match_sequence(fixture, test_system, expr_array, timeout=0):
+#-------------------------------------------------------------------------------
+def run_test_log_match_sequence(fixture, test_system, expr_array, timeout_sec=0):
     """will take an array of regular expressions and perform the simple test.
     The order of the elements in the array matters, must be the same order in
     the log file"""
 
+    # ToDo: this starts the system if it is not already running. We should have
+    #       a check here if the boot itself went well, so we don't count this
+    #       time against the actual test. Also, if the boot fails, we can abort
+    #       the test early already and do not wait the full test specific
+    #       timeout.
     test_run = fixture(test_system)
     f_out = test_run[1]
 
-    start   = time.time()
-    elapsed = 0
+    (ret, text, expr_fail) = logs.check_log_match_sequence(
+                                f_out,
+                                expr_array,
+                                timeout_sec)
 
-    for expr in expr_array:
-        remaining_time = timeout - elapsed
-        assert remaining_time > 0
-        assert_log_match(re.escape(expr), f_out, remaining_time)
-        elapsed += time.time() - start
+    if not ret:
+        raise Exception(" missing: %s"%(expr_fail))
 
-def run_test_log_match_set(fixture, test_system, expr_array, timeout=0):
+
+#-------------------------------------------------------------------------------
+def run_test_log_match_set(fixture, test_system, expr_array, timeout_sec=0):
     """will take an array of regular expressions and perform the simple test.
     The order of the elements in the array does not matter, the matches just
     have to be there in the log occurring at any time at the least once per
     single expression"""
 
-    # TODO: this implementation in not optimal, optimize
+    # ToDo: this starts the system if it is not already running. We should have
+    #       a check here if the boot itself went well, so we don't count this
+    #       time against the actual test. Also, if the boot fails, we can abort
+    #       the test early already and do not wait the full test specific
+    #       timeout.
+    test_run = fixture(test_system)
+    f_out = test_run[1]
 
-    # make sure that the timeout is not consumed in booting the application
-    fixture(test_system)
+    (ret, text, expr_fail) = logs.check_log_match_set(
+                                f_out,
+                                expr_array,
+                                timeout_sec)
+    if not ret:
+        raise Exception(" missing: %s"%(expr_fail))
 
-    start   = time.time()
-    elapsed = 0
 
-    for expr in expr_array:
-        remaining_time = timeout - elapsed
-        assert remaining_time > 0
-        run_test_log_match(fixture, test_system, expr, remaining_time)
-        elapsed += time.time() - start
+#-------------------------------------------------------------------------------
+def run_test_log_match(fixture, test_system, expr, timeout_sec=0):
+    """performs the simplest test by getting the log file from the fixture and
+    then assert the match of the regular expression in a line of the log"""
+
+    return run_test_log_match_set(fixture, test_system, [expr], timeout_sec)
