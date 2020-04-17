@@ -41,7 +41,7 @@ def run_test_log_match_sequence(fixture, test_system, expr_array, timeout=0):
 def run_test_log_match_set(fixture, test_system, expr_array, timeout=0):
     """will take an array of regular expressions and perform the simple test.
     The order of the elements in the array does not matter, the matches just
-    have to be there in the log occuring at any time at the least once per
+    have to be there in the log occurring at any time at the least once per
     single expression"""
 
     # TODO: this implementation in not optimal, optimize
