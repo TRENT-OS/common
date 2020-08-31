@@ -1,0 +1,10 @@
+*.egg-info
+*.pyc
+*.pyo
+**/.DS_Store
+MANIFEST
+pyusb*
+dist/
+build/
+sphinx/
+.vscode/
