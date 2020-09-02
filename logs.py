@@ -152,8 +152,7 @@ def check_log_match_sequence(f, expr_array, timeout_sec=0):
     for expr in expr_array:
 
         new_timeout = get_remaining_timeout_or_zero(time_end)
-
-        (text_part, match) = get_match_in_line(f, re.escape(expr), timeout_sec)
+        (text_part, match) = get_match_in_line(f, re.escape(expr), new_timeout)
         text += text_part
         if match is None:
             print("No match for '%s'" % expr)
