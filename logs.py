@@ -165,6 +165,43 @@ def check_log_match_sequence(f, expr_array, timeout_sec=0):
 
 
 #-------------------------------------------------------------------------------
+def check_log_match_multiple_sequences(f, seq_expr_array):
+    """
+    Takes an array of tupels, each holding a timeout and sequence of regular
+    expressions to match withing this timeout in the given order. Calls
+    check_log_match_sequence() for each tupel
+
+    Args:
+    f(file): the file handler of the log (shall be opened for non-blocking op)
+    seq_expr_array: array of arrays with strings to match and timeout
+    """
+
+    text = ""
+
+    for idx, (expr_array, timeout_sec) in enumerate(seq_expr_array):
+
+        time_end = time.time() + timeout_sec
+
+        for expr in expr_array:
+
+            timeout_sec = get_remaining_timeout_or_zero(time_end)
+
+            (text_part, match) = get_match_in_line(
+                                    f,
+                                    re.escape(expr),
+                                    timeout_sec)
+            text += text_part
+            if match is None:
+                print('No match in sequence #{} for: {}'.format(idx, expr))
+                return (False, text, expr, idx)
+
+            # we don't support any wildcards for now
+            assert(match == expr)
+
+    return (True, text, None, 0)
+
+
+#-------------------------------------------------------------------------------
 def check_log_match_set(f, expr_array, timeout_sec=0):
     """
     Take an array of regular expressions and perform the simple test. The order
