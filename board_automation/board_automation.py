@@ -18,12 +18,14 @@ class Run_Context(object):
         log_dir,
         platform,
         system_image,
+        sd_card_size,
         printer = None,
         print_log = False):
 
         self.log_dir      = log_dir
         self.platform     = platform
         self.system_image = system_image
+        self.sd_card_size = sd_card_size
         self.printer      = printer
         self.print_log    = print_log
 

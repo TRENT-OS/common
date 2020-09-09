@@ -263,6 +263,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         super().__init__(run_context, None)
 
+        self.sd_card_size = run_context.sd_card_size
         self.proxy_cfg_str = proxy_cfg_str
 
         self.bridge = TcpBridge(self.run_context.printer)
@@ -283,6 +284,24 @@ class QemuProxyRunner(board_automation.System_Runner):
     def is_proxy_running(self):
         return self.process_proxy and self.process_proxy.is_running()
 
+    #---------------------------------------------------------------------------
+    def get_qemu_sd_card_params(self):
+        sd_card_params = []
+
+        self.print(self.sd_card_size)
+
+        if (self.sd_card_size and self.sd_card_size > 0):
+            sd_card_image_name = self.get_log_file_fqn('sdcard1.img')
+
+            with open(sd_card_image_name, 'wb') as sd_card_image:
+                sd_card_image.truncate(self.sd_card_size)
+
+            sd_card_params = \
+                ['-drive', 'file=' + sd_card_image_name
+                            + ',format=raw,id=mycard',
+                 '-device', 'sd-card,drive=mycard']
+
+        return sd_card_params
 
     #---------------------------------------------------------------------------
     def start_qemu(self, print_log):
@@ -310,7 +329,8 @@ class QemuProxyRunner(board_automation.System_Runner):
             # UART 1 is used for a syslog
             '-serial', 'file:{}'.format(self.system_log_file.name),
             '-kernel', self.run_context.system_image,
-        ]
+        ]+ \
+        self.get_qemu_sd_card_params()
 
         self.process_qemu = process_tools.ProcessWrapper(
                                 cmd_arr,

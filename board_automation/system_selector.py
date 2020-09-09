@@ -11,12 +11,14 @@ def get_test_runner(
         platform,
         system_image,
         proxy_config,
+        sd_card_size,
         print_log = False ):
 
     run_context = board_automation.Run_Context(
                     log_dir,
                     platform,
                     system_image,
+                    sd_card_size,
                     tools.PrintSerializer(),
                     print_log)
 
