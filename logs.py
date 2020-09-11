@@ -81,7 +81,6 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
             # simply kills the test.
             new_timeout = get_remaining_timeout_or_zero(time_end)
             if (0 == new_timeout):
-                print("timeout waiting for complete line (%d byte read)"%(len(line)))
                 return None
 
             # we still have time left, so sleep a while and check again. Note
@@ -124,7 +123,6 @@ def get_match_in_line(f, regex, timeout_sec=0):
         new_timeout = get_remaining_timeout_or_zero(time_end)
         line = read_line_from_log_file_with_timeout(f, new_timeout)
         if line is None:
-            print("timeout waiting for next line (%d byte read)"%(len(text)))
             return (text, None)
 
         text += line
@@ -231,7 +229,6 @@ def check_log_match_set(f, expr_array, timeout_sec=0):
         new_timeout = get_remaining_timeout_or_zero(time_end)
         line = read_line_from_log_file_with_timeout(f, new_timeout)
         if line is None:
-            print("timeout waiting for next line (%d byte read)"%(len(text)))
             return (False, text, expr_dict.keys())
 
         text += line
