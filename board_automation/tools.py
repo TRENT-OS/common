@@ -84,6 +84,7 @@ class Log_File(object):
     #---------------------------------------------------------------------------
     def __init__(self, name):
         self.name = name
+        self.monitor_thread = None
 
 
     #---------------------------------------------------------------------------
@@ -170,10 +171,10 @@ class Log_File(object):
             # printer.print('[{}] monitor terminated for {}'.format(self, self.name))
 
 
-        threading.Thread(
-            target = monitoring_thread,
-            args = ()
-        ).start()
+        self.monitor_thread = threading.Thread(
+                                target = monitoring_thread,
+                                args = ()
+                              ).start()
 
     #---------------------------------------------------------------------------
     @classmethod
