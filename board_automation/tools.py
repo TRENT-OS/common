@@ -8,13 +8,6 @@ import datetime
 import re
 
 
-#-------------------------------------------------------------------------------
-def get_remaining_timeout_or_zero(time_end):
-        time_now = time.time()
-        return 0 if (time_now >= time_end) \
-               else time_end - time_now
-
-
 #===============================================================================
 #===============================================================================
 
@@ -25,11 +18,16 @@ class Timeout_Checker(object):
     # indicate "do not block".
     def __init__(self, timeout_sec):
 
-        self.timeout_sec = timeout_sec
+        time_now = time.time()
 
-        self.time_end = time.time()
+        if (timeout_sec is None) or (timeout_sec < 0):
+            timeout_sec = -1
+
+        self.timeout_sec = timeout_sec
+        self.time_end = None
+
         if (timeout_sec > 0):
-            self.time_end += timeout_sec
+            self.time_end = time_now + timeout_sec
 
 
     #---------------------------------------------------------------------------
@@ -42,18 +40,24 @@ class Timeout_Checker(object):
     def is_infinite(self):
         return (self.timeout_sec < 0)
 
+
+    #---------------------------------------------------------------------------
+    def has_expired(self):
+        return (not self.is_infinite()) and (time.time() >= self.time_end)
+
+
     #---------------------------------------------------------------------------
     # this returns a value greater or equal zero, negative values indicate that
     # the timeout is infinite
     def get_remaining(self):
-        return -1 if self.is_infinite() \
-               else get_remaining_timeout_or_zero(self.time_end)
+        if self.is_infinite():
+            return -1
 
-    #---------------------------------------------------------------------------
-    def has_expired(self):
-        # remaining time is -1 for infinite, 0 if expired and a value greater
-        # zero otherwise. So checking for 0 does the job nicely
-        return 0 == self.get_remaining()
+        time_now = time.time()
+        if (time_now >= self.time_end):
+            return 0
+
+        return self.time_end - time_now
 
 
     #---------------------------------------------------------------------------
@@ -62,7 +66,7 @@ class Timeout_Checker(object):
 
         if not self.is_infinite():
 
-            timeout_remining = get_remaining_timeout_or_zero(self.time_end)
+            timeout_remining = self.get_remaining()
 
             # don't sleep at all if there is no time left
             if (0 == timeout_remining):
