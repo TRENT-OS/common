@@ -127,7 +127,7 @@ class Log_File(object):
 
         #-----------------------------------------------------------------------
         def readline_loop():
-            line = ""
+            line = ''
             while True:
                 # readline() returns a string terminated by "\n" for every
                 # complete line. On timeout (ie. EOF reached), there is no
@@ -138,7 +138,7 @@ class Log_File(object):
                 # "\r\n" as line break, thus "\n\r" is taken as two line
                 # breaks and we see a lot of empty lines in the logs
                 line += f_log.readline()
-                if line.endswith("\n"):
+                if line.endswith('\n'):
                     return line
 
                 # could not read a complete line, check termination request

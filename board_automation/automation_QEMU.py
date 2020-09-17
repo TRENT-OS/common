@@ -80,7 +80,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                                 log_file_stderr = self.get_log_file_fqn('proxy_err.txt'),
                                 printer = self.run_context.printer,
                                 name = 'Proxy'
-                            )
+                             )
 
         self.print('starting Proxy: {}'.format(' '.join(cmd_arr)))
         self.print('  proxy stdout:   {}'.format(self.process_proxy.log_file_stdout))
@@ -92,7 +92,7 @@ class QemuProxyRunner(board_automation.System_Runner):
     #---------------------------------------------------------------------------
     def get_qemu_serial_connection_params(self, serial_qemu_connection):
 
-        if(serial_qemu_connection == 'PTY'):
+        if (serial_qemu_connection == 'PTY'):
 
             # must use '-S' to freeze the QEMU at startup, unfreezing happens
             # when the other end of PTY is connected
@@ -203,7 +203,6 @@ class QemuProxyRunner(board_automation.System_Runner):
     def do_start(self, print_log):
 
         serial_qemu_connection = 'TCP'
-
         proxy_app = None
 
         if self.proxy_cfg_str:
