@@ -30,6 +30,30 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.serial_socket = None
 
 
+
+    #---------------------------------------------------------------------------
+    @classmethod
+    def get_qemu_serial_connection_params(cls, serial_qemu_connection):
+
+        if (serial_qemu_connection == 'PTY'):
+
+            # must use '-S' to freeze the QEMU at startup, unfreezing happens
+            # when the other end of PTY is connected
+            return ['-S', '-serial', 'pty']
+
+        elif (serial_qemu_connection == 'TCP'):
+
+            # QEMU will freeze on startup until it can connect to the server
+            return ['-serial', 'tcp:localhost:4444,server']
+
+        elif (serial_qemu_connection == 'UDP'):
+            return ['-serial', 'udp:localhost:4444']
+
+        else:
+
+            return ['-serial', '/dev/null']
+
+
     #---------------------------------------------------------------------------
     def is_qemu_running(self):
         return self.process_qemu and self.process_qemu.is_running()
@@ -41,9 +65,32 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    def start_qemu(self, cmd_arr, print_log):
+    def start_qemu(self, serial_qemu_connection, print_log):
 
         assert( not self.is_qemu_running() )
+
+        qemu_mapping = {
+            # <plat>: ['<qemu-binary-arch>', '<qemu-machine>'],
+            'imx6':      ['arm',     'sabrelite'],
+            'migv':      ['riscv64', 'virt'],
+            'rpi3':      ['aarch64', 'raspi3'],
+            'spike':     ['riscv64', 'spike_v1.10'],
+            'zynq7000':  ['arm',     'xilinx-zynq-a9'],
+        }.get(self.run_context.platform, None)
+
+        assert(qemu_mapping is not None)
+
+        cmd_arr = [
+                'qemu-system-{}'.format(qemu_mapping[0]),
+                '-machine', qemu_mapping[1],
+                '-m', 'size=1024M',
+                '-nographic'
+            ] + \
+            self.get_qemu_serial_connection_params(serial_qemu_connection) + \
+            [
+                '-serial', 'file:{}'.format(self.system_log_file.name),
+                '-kernel', self.run_context.system_image,
+            ]
 
         self.process_qemu = process_tools.ProcessWrapper(
                                 cmd_arr,
@@ -215,15 +262,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             if (1 != len(arr)):
                 serial_qemu_connection = arr[1]
 
-        qemu_cmd = self.get_qemu_machine_params() + \
-                   self.get_qemu_serial_connection_params(
-                        serial_qemu_connection) + \
-                   [
-                       '-serial', 'file:{}'.format(self.system_log_file.name),
-                       '-kernel', self.run_context.system_image,
-                   ]
-
-        self.start_qemu(qemu_cmd, print_log)
+        self.start_qemu(serial_qemu_connection, print_log)
 
         # give QEMU process time to start. Instead of using a fixed value here
         # that was found by testing, we should use smarter methods an retries
