@@ -18,16 +18,14 @@ class Timeout_Checker(object):
     # indicate "do not block".
     def __init__(self, timeout_sec):
 
-        time_now = time.time()
+        self.time_end = None
 
         if (timeout_sec is None) or (timeout_sec < 0):
             timeout_sec = -1
+        else:
+            self.time_end = time.time() + timeout_sec
 
         self.timeout_sec = timeout_sec
-        self.time_end = None
-
-        if (timeout_sec > 0):
-            self.time_end = time_now + timeout_sec
 
 
     #---------------------------------------------------------------------------
@@ -38,7 +36,7 @@ class Timeout_Checker(object):
 
     #---------------------------------------------------------------------------
     def is_infinite(self):
-        return (self.timeout_sec < 0)
+        return (self.time_end is None)
 
 
     #---------------------------------------------------------------------------
@@ -129,10 +127,7 @@ class Log_File(object):
         start = datetime.datetime.now()
         f_log = self.open_non_blocking(checker_func = checker_func)
         if not f_log:
-            printer.print(
-                '[{}] monitor terminated, could not open: {}'.format(
-                    self, self.name))
-            return
+            raise Exception('monitor failed, could not open: {}'.format(self.name))
 
 
         #-----------------------------------------------------------------------
