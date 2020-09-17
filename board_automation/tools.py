@@ -136,6 +136,8 @@ class Log_File(object):
                         timeout = timeout,
                         checker_func = checker_func)
             if not f_log:
+                # we see this when opening the file failed and we've finally
+                # reached the timeout or the checker function told us to stop
                 raise Exception('monitor failed, could not open: {}'.format(self.name))
 
             with f_log:
@@ -143,16 +145,17 @@ class Log_File(object):
                 while not is_abort:
                     line = ''
                     while True:
-                        # readline() returns a string terminated by "\n" for every
-                        # complete line. On timeout (ie. EOF reached), there is no
-                        # terminating "\n"
-                        # Unfortunately, there is a line break bug in some logs,
-                        # where "\n\r" (LF+CR) is used instead of "\r\n" (CR+LF).
-                        # Universal newline handling only considers "\r", "\n" and
-                        # "\r\n" as line break, thus "\n\r" is taken as two line
-                        # breaks and we see a lot of empty lines in the logs
+                        # readline() returns a string terminated by "\n" for
+                        # every complete line. On timeout (ie. EOF reached),
+                        # there is no terminating "\n".
                         line += f_log.readline()
                         if line.endswith('\n'):
+                            # Unfortunately, there is a line break bug in some
+                            # logs, where "\n\r" (LF+CR) is used instead of
+                            # "\r\n" (CR+LF). Universal newline handling only
+                            # considers "\r", "\n" and "\r\n" as line break,
+                            # thus "\n\r" is taken as two line breaks and we
+                            # see a lot of empty lines in the logs
                             break
 
                         # could not read a complete line, check termination request

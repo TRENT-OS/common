@@ -59,12 +59,13 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         self.process_qemu.start(print_log)
 
-        # now that a QEMU process exists, start the monitor thread. The checker
-        # function ensure it automatically terminated when the QEMU process
-        # terminates. We use an infinite timeout, as we don't have here when the
-        # system log file is created - it may take some time if nothing is
-        # logged or it may not happen at all if nothing is logged.
         if print_log:
+            # now that a QEMU process exists, start the monitor thread. The
+            # checker function ensures it automatically terminates when the
+            # QEMU process terminates. We use an infinite timeout, as we don't
+            # care when the system log file is created - it may take some time
+            # if nothing is logged or it may not happen at all if nothing is
+            # logged.
             self.system_log_file.start_monitor(
                 printer = self.run_context.printer,
                 timeout = tools.Timeout_Checker.infinite(),
