@@ -33,6 +33,12 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
+    @classmethod
+    def infinite(cls):
+        return cls(-1)
+
+
+    #---------------------------------------------------------------------------
     def is_infinite(self):
         return (self.timeout_sec < 0)
 
@@ -83,7 +89,7 @@ class Log_File(object):
     # has expired or the checker function says we can stop
     def open_non_blocking(
             self,
-            timeout = Timeout_Checker(-1), # infinite timeout
+            timeout = Timeout_Checker.infinite(),
             newline = None, # use universal newline mode by default
             mode = 'rt', # read-only text file
             checker_func = None ):
