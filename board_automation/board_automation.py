@@ -111,7 +111,7 @@ class System_Runner(object):
 
 
     #---------------------------------------------------------------------------
-    # sub-classes may extend this
+    # sub-classes may overwrite this
     def check_start_success(self):
 
         (ret , idx, idx2) = self.system_log_match_multiple_sequences([

@@ -151,11 +151,11 @@ class QemuProxyRunner(board_automation.System_Runner):
         connection_mode = None
 
         if (serial_qemu_connection == 'PTY'):
+
+            # search for dev/ptsX info in QEMU's output, it used to be printed
+            # to  stderr but QEMU 4.2 changed it to stdout
             pattern = re.compile('(\/dev\/pts\/\d)')
             match = None
-
-            # search for dev/ptsX info in QEMU's output, it used to be in stderr
-            # but QEMU 4.2 change it to stdout
             for filename in [
                 self.process_qemu.log_file_stdout,
                 self.process_qemu.log_file_stderr

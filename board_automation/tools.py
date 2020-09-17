@@ -21,7 +21,8 @@ def get_remaining_timeout_or_zero(time_end):
 class Timeout_Checker(object):
 
     #---------------------------------------------------------------------------
-    # any value less than 0 means infinite
+    # any value less than 0 or None means infinite, the value 0 can be used to
+    # indicate "do not block".
     def __init__(self, timeout_sec):
 
         self.timeout_sec = timeout_sec
@@ -36,6 +37,8 @@ class Timeout_Checker(object):
         return (self.timeout_sec < 0)
 
     #---------------------------------------------------------------------------
+    # this returns a value greater or equal zero, negative values indicate that
+    # the timeout is infinite
     def get_remaining(self):
         return -1 if self.is_infinite() \
                else get_remaining_timeout_or_zero(self.time_end)
@@ -59,6 +62,7 @@ class Timeout_Checker(object):
             if (0 == timeout_remining):
                 return
 
+            # adapt sleep time to not exceed the remaining time
             timeout = min(timeout, timeout_remining)
 
         time.sleep(timeout)
@@ -102,7 +106,7 @@ class Log_File(object):
                 return None
 
             # wait and try again. Using 100 ms seems a good trade-off here, so
-            # we don't block for too long or cause too much CPU load
+            # we don't block for too long or cause much CPU load
             timeout.sleep(0.1)
 
 
@@ -175,8 +179,9 @@ class Log_File(object):
 
         while True:
 
-            # this is a non-blocking read, so if we read something not ending
-            # in '\n', it mean we have reached the end
+            # if we've opened the file in non-blocking mode, this is a
+            # non-blocking read, ie if we read something not ending with '\n',
+            # it means we have reached the end of input
             line += hLog.readline()
             is_timeout = (timeout is None) or timeout.has_expired()
             if (not line.endswith('\n')) and (not is_timeout):
@@ -252,7 +257,7 @@ class Log_File(object):
     #---------------------------------------------------------------------------
     def match_multiple_sequences(self, seq_arr):
 
-        # for the first timeout, opening the file also counts.
+        # opening the file counts towards the first sequences timeout
         (expr_array, timeout_sec) = seq_arr[0]
         timeout = Timeout_Checker(timeout_sec)
 
