@@ -91,7 +91,7 @@ class Log_File(object):
     # has expired or the checker function says we can stop
     def open_non_blocking(
             self,
-            timeout = Timeout_Checker.infinite(),
+            timeout = None,
             newline = None, # use universal newline mode by default
             mode = 'rt', # read-only text file
             checker_func = None ):
