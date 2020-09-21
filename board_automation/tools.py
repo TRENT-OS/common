@@ -3,6 +3,7 @@
 import sys
 import traceback
 import os
+import pathlib
 import fcntl
 import socket
 import selectors
@@ -10,6 +11,131 @@ import threading
 import time
 import datetime
 import re
+
+
+#-------------------------------------------------------------------------------
+# implement "@class_or_instancemethod" attribute for methods
+class class_or_instance_method(classmethod):
+
+    def __get__(self, instance, type_):
+
+        descr_get = super().__get__ if instance is None \
+                    else self.__func__.__get__
+
+        return descr_get(instance, type_)
+
+
+#-------------------------------------------------------------------------------
+def add_subdir_to_sys_path(path, subdir):
+    sys.path.append(
+        os.path.join(
+            str(pathlib.Path(path).parent.absolute()),
+            subdir
+        )
+    )
+
+
+#-------------------------------------------------------------------------------
+def print_files_from_folder(folder):
+
+    filenames = os.listdir(folder)
+
+    for f in filenames:
+        fqn = os.path.join(folder, f)
+        stat_info = os.lstat(fqn)
+        time_str = time.strftime(
+                        "%Y-%m-%d %H:%M:%S",
+                        time.gmtime(stat_info.st_mtime))
+
+        print('  {:8d}   {}   {}'.format(stat_info.st_size, time_str, f))
+
+
+#-------------------------------------------------------------------------------
+def get_mountpoints():
+
+    def parse_mntpt(line):
+        dev, mntpt, _ = line.split(None, 2)
+        return dev, mntpt
+
+    with open('/proc/mounts') as f:
+        return dict(map(parse_mntpt, f.readlines()))
+
+
+#-------------------------------------------------------------------------------
+def get_mountpoint_for_dev(dev):
+
+    mntpts = get_mountpoints()
+    return mntpts.get(dev)
+
+
+#-------------------------------------------------------------------------------
+def get_disk_id_for_dev(dev):
+    folder = '/dev/disk/by-id'
+
+    filenames = os.listdir(folder)
+    for f in filenames:
+        fqn = os.path.join(folder, f)
+        if not os.path.islink(fqn): continue
+
+        link = os.readlink(fqn)
+        link_fqn = os.path.join(folder,link)
+        linked_dev = os.path.abspath(link_fqn)
+
+        if linked_dev == dev:
+            return f
+
+    return None
+
+
+#-------------------------------------------------------------------------------
+def get_disk_path_for_dev(dev):
+
+    # for dev, mp in mntpts.items(): print('{} -> {}'.format(dev, mp))
+
+    folder = '/dev/disk/by-path'
+    # contains things like
+    #   pci-0000:00:14.0-usb-0:4.2.1.2.1:1.0-scsi-0:0:0:0-part1 -> ../../sda1
+    #   pci-0000:00:14.0-usb-0:4.2.1.2.1:1.0-scsi-0:0:0:0 -> ../../sda
+    #
+    # check for pattern: <buf>-usb-<path>-scsi-<path>[-<id>]
+
+
+    filenames = os.listdir(folder)
+    for f in filenames:
+        fqn = os.path.join(folder, f)
+        if not os.path.islink(fqn): continue
+
+        link = os.readlink(fqn)
+        link_fqn = os.path.join(folder,link)
+        linked_dev = os.path.abspath(link_fqn)
+
+        if linked_dev == dev:
+            return f
+
+    return None
+
+
+#-------------------------------------------------------------------------------
+def find_usb_by_serial(serial):
+
+    base_dir = '/sys/bus/usb/devices'
+
+    print('check {} for serial: {}'.format(base_dir, serial))
+
+    def get_id(dn, id_file):
+        file_name = os.path.join(dn, id_file)
+        if not os.path.exists(file_name): return None
+        with open(file_name) as f:
+            return f.read().strip()
+
+    for usbid in os.listdir(base_dir):
+        dn = os.path.join(base_dir, usbid)
+        if (serial == get_id(dn, 'serial')):
+            print('  {}:{} at {}'.format(
+                    get_id(dn, 'idVendor'),
+                    get_id(dn, 'idProduct'),
+                    dn))
+            # no break here, serial may not be unique
 
 
 #-------------------------------------------------------------------------------
