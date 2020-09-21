@@ -7,8 +7,7 @@ import os
 import subprocess
 import threading
 
-import logs
-
+from . import tools
 from . import process_tools
 from . import board_automation
 
@@ -161,9 +160,11 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.process_qemu.log_file_stdout,
                 self.process_qemu.log_file_stderr
             ]:
-                with logs.open_file_non_blocking(filename,'r') as f:
-                    (text, match) = logs.get_match_in_line(f, pattern, 1)
-                    if match is not None: break;
+                match = Log_File(filename).find_match_in_lines(
+                            pattern,
+                            tools.Timeout_Checker(5))
+                if match is not None:
+                    break;
 
             if match is None:
                 raise Exception('ERROR: could not get QEMU''s /dev/ptsX')

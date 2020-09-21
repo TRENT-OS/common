@@ -114,7 +114,7 @@ class System_Runner(object):
     # sub-classes may extend this
     def check_start_success(self):
 
-        self.system_log_match_multiple_sequences([
+        (ret , idx, idx2) = self.system_log_match_multiple_sequences([
 
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
@@ -138,6 +138,9 @@ class System_Runner(object):
             #( [ 'CapDL Loader done, suspending...' ], 20),
             ( [ 'Done; suspending...' ], 20),
         ])
+
+        if not ret:
+            raise Exception('boot string #{}.{} not found'.format(idx, idx2))
 
 
     #---------------------------------------------------------------------------
@@ -168,14 +171,11 @@ class System_Runner(object):
 
     #---------------------------------------------------------------------------
     def system_log_match_sequence(self, str_arr, timeout_sec = 0):
-        return self.system_log_file.match_sequence(str_arr, timeout_sec)
+        return self.system_log_file.match_sequence(
+                    str_arr,
+                    tools.Timeout_Checker(timeout_sec))
 
 
     #---------------------------------------------------------------------------
     def system_log_match_multiple_sequences(self, seq_arr):
         return self.system_log_file.match_multiple_sequences(seq_arr)
-
-
-    #---------------------------------------------------------------------------
-    def system_log_match_set(self, str_arr, timeout_sec = 0):
-        return self.system_log_file.match_set(str_arr, timeout_sec)
