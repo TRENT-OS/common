@@ -120,10 +120,11 @@ class System_Runner(object):
             # This can take some time depending on the board's boot process
             ( [ 'ELF-loader started' ], 10 ),
 
-            # give the ELF Loader 10 seconds to unpack the system
-            #   unfortunately, not every platform is showing this string
-            #( [ 'Jumping to kernel-image entry point...' ], 10 ),
-            ( [ 'Bootstrapping kernel' ], 1 ),
+            # give the ELF Loader 10 seconds to unpack the system. Some
+            # platforms print "Jumping to kernel-image entry point..." when
+            # ELF loader is done, but some don't. So all we can do is wait for
+            # some kernel message here.
+            ( [ 'Bootstrapping kernel' ], 10 ),
 
             # check if the seL4 kernel booted properly, 5 secs should be enough
             ( [ 'Booting all finished, dropped to user space' ], 5),
