@@ -12,6 +12,224 @@ from . import process_tools
 from . import board_automation
 
 
+
+#===============================================================================
+#===============================================================================
+
+class TcpBridge():
+
+    #---------------------------------------------------------------------------
+    def __init__(self, printer = None):
+
+        self.printer = printer
+
+        self.thread_client = None
+        self.socket_client = None
+
+        self.thread_server = None
+        self.server_socket = None
+        self.server_socket_client = None
+
+        # the buffer size value has has been picked based on observations, the
+        # largest value seen so far was 4095, which might be related to
+        # - the 4 KiByte pages that ARM and RISC-V uses
+        # - seL4/CAmkES based systems often use shared buffers of 4 KiByte.
+        self.buffer_size = 8192
+
+
+    #---------------------------------------------------------------------------
+    # sub-classes may extend this
+    def print(self, msg):
+        if self.printer:
+            self.printer.print(msg)
+
+
+    #---------------------------------------------------------------------------
+    def close_server_sockets(self):
+        s = self.server_socket_client
+        self.server_socket_client = None
+        if s:
+            s.close()
+
+        s = self.server_socket
+        self.server_socket = None
+        if s:
+            s.close()
+
+
+    #---------------------------------------------------------------------------
+    def stop_server(self):
+
+        if self.thread_server is None:
+            return
+
+        self.close_server_sockets()
+        # since we have closed server_socket_client, the thread can't get more
+        # input and is expected to terminate. This is just a safe-guard to
+        # ensure it really terminates - and if it does not terminate, we see
+        # this because thing are stuck here
+        while True:
+            t = self.thread_server
+            if not t or not t.is_alive():
+                break;
+            t.join(0.1)
+
+
+    #---------------------------------------------------------------------------
+    def shutdown(self):
+
+        self.stop_server()
+
+        s = self.socket_client
+        self.socket_client = None
+        if s:
+            s.close()
+
+        # since we have closed the socket_client, the thread can't get more
+        # input and is expected to terminate. This is just a safe-guard to
+        # ensure it really terminates - and if it does not terminate, we see
+        # this because thing are stuck here
+        while True:
+            t = self.thread_client
+            if t is None or not t.is_alive():
+                break;
+            self.print('join...')
+            t.join(0.1)
+
+
+    #---------------------------------------------------------------------------
+    def connect_to_server(self, addr, port, timeout = None):
+
+        peer = (addr, port)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # try to connect to server
+        while True:
+            try:
+                s.connect(peer)
+                break
+
+            except:
+                if not timeout or timeout.has_expired():
+                    raise Exception('could not connect to {}:{}'.format(addr, port))
+
+            # using 250 ms here seems a good trade-off. Even if there is some
+            # system load, we usually succeed after one retry. Using 100 ms
+            # here just end up on more retries as it seems startup is either
+            # quite quick or it takes some time.
+            timeout.sleep(0.25)
+
+        self.print('TCP connection established to {}:{}'.format(addr, port))
+        self.socket_client = s
+
+
+    #---------------------------------------------------------------------------
+    def start_server(self, port):
+
+        if self.socket_client is None:
+            raise Exception('no connected to any server')
+
+        self.socket_client = tools.Socket_With_Read_Cancellation(
+                                self.socket_client)
+
+        def socket_forwarder_loop(f_get_socket_src, f_get_socket_dst):
+
+            cnt = 0
+            max_pck = 0
+
+            while True:
+
+                socket_src = f_get_socket_src()
+                if not socket_src:
+                    # seem somebody wants to stop the loop
+                    break
+
+                data = None
+                try:
+                    data = socket_src.recv(self.buffer_size)
+                except:
+                    # something went wrong while waiting for data. We don't
+                    # really care what exactly this is and simply exit the loop
+                    exc_info = sys.exc_info()
+                    msg = exc_info[1]
+                    self.print('socket exception: {}'.format(msg))
+                    traceback.print_exception(*exc_info)
+                    break
+
+                if not data:
+                    # seems the socket got closed
+                    break
+
+                l = len(data)
+                cnt += l
+                if (l > max_pck):
+                    max_pck = l
+
+                socket_dst = f_get_socket_dst()
+                if not socket_dst:
+                    self.print('missing output socket, dropping {} bytes'.format(l))
+                else:
+                    socket_dst.sendall(data)
+
+            # self.print('input socket closed, cnt={}, max_pck={}, terminating'.format(cnt, max_pck))
+
+
+
+        # start reader thread
+        def my_thread_client(thread):
+            socket_forwarder_loop(
+                lambda: self.socket_client,
+                lambda: self.server_socket_client)
+            # we do not close the socket here, this will happen in the cleanup
+            # eventually. Until then, the socket can still be used
+            self.thread_client = None
+
+
+        self.thread_client = tools.run_in_thread(my_thread_client)
+
+        peer = ('127.0.0.1', port)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(peer)
+            s.listen()
+        except:
+            s.close()
+            raise Exception('could not connect to {}:{}'.format(addr, port))
+
+        self.server_socket = s
+
+        def my_thread_server(thread):
+            (self.server_socket_client, addr) = self.server_socket.accept()
+            self.print('bridge server connection from {}'.format(addr[0]))
+            with self.server_socket_client:
+                socket_forwarder_loop(
+                    lambda: self.server_socket_client,
+                    lambda: self.socket_client)
+            # if the thread terminated, close all server sockets
+            self.close_server_sockets()
+            self.thread_server = None
+
+        self.thread_server = tools.run_in_thread(my_thread_server)
+
+
+    #---------------------------------------------------------------------------
+    # if start_server() is not used, this will release the source socket
+    def get_source_socket(self):
+
+        if self.thread_client is not None:
+
+            self.stop_server()
+            # unblock any pending socket read operation
+            self.socket_client.cancel_recv()
+            # wait until the thread has died
+            while self.thread_client is not None:
+                time.sleep(0.1)
+
+            self.socket_client = self.socket_client.get_socket()
+
+        return self.socket_client
+
+
 #===============================================================================
 #===============================================================================
 
@@ -24,34 +242,13 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         self.proxy_cfg_str = proxy_cfg_str
 
+        self.bridge = TcpBridge(self.run_context.printer)
+
         self.process_qemu = None
+        self.qemu_uart_network_port = 4444
+
         self.process_proxy = None
-
-        self.serial_socket = None
-
-
-
-    #---------------------------------------------------------------------------
-    @classmethod
-    def get_qemu_serial_connection_params(cls, serial_qemu_connection):
-
-        if (serial_qemu_connection == 'PTY'):
-
-            # must use '-S' to freeze the QEMU at startup, unfreezing happens
-            # when the other end of PTY is connected
-            return ['-S', '-serial', 'pty']
-
-        elif (serial_qemu_connection == 'TCP'):
-
-            # QEMU will freeze on startup until it can connect to the server
-            return ['-serial', 'tcp:localhost:4444,server']
-
-        elif (serial_qemu_connection == 'UDP'):
-            return ['-serial', 'udp:localhost:4444']
-
-        else:
-
-            return ['-serial', '/dev/null']
+        self.proxy_network_port = 4445
 
 
     #---------------------------------------------------------------------------
@@ -65,7 +262,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    def start_qemu(self, serial_qemu_connection, print_log):
+    def start_qemu(self, print_log):
 
         assert( not self.is_qemu_running() )
 
@@ -81,16 +278,16 @@ class QemuProxyRunner(board_automation.System_Runner):
         assert(qemu_mapping is not None)
 
         cmd_arr = [
-                'qemu-system-{}'.format(qemu_mapping[0]),
-                '-machine', qemu_mapping[1],
-                '-m', 'size=1024M',
-                '-nographic'
-            ] + \
-            self.get_qemu_serial_connection_params(serial_qemu_connection) + \
-            [
-                '-serial', 'file:{}'.format(self.system_log_file.name),
-                '-kernel', self.run_context.system_image,
-            ]
+            'qemu-system-{}'.format(qemu_mapping[0]),
+            '-machine', qemu_mapping[1],
+            '-m', 'size=1024M',
+            '-nographic',
+            # UART 0 is available for data exchange
+            '-serial', 'tcp:localhost:{},server'.format(self.qemu_uart_network_port),
+            # UART 1 is used for a syslog
+            '-serial', 'file:{}'.format(self.system_log_file.name),
+            '-kernel', self.run_context.system_image,
+        ]
 
         self.process_qemu = process_tools.ProcessWrapper(
                                 cmd_arr,
@@ -119,11 +316,53 @@ class QemuProxyRunner(board_automation.System_Runner):
                 checker_func = lambda: self.is_qemu_running()
             )
 
+        # QEMU is starting up now. If some output is redirected to files, these
+        # files may not exist until there is some actual output written. There
+        # is not much gain if we sleep here hoping the file pop into existence.
+        # The users of these files must care of them no existing and then
+        # popping into existence eventually
+        # Now start a TCP server to connect to QEMU's serial port. It depends
+        # on the system load how long the QEMU process takes to start and also
+        # when QEMU's internal startup is done, so the QEMU is listening on the
+        # port. Tests showed that without system load, timeouts are rarely
+        # needed, but once there is a decent system load, even 500 ms may not
+        # be enough. With 5 seconds we should be safe.
+        self.bridge.connect_to_server(
+            '127.0.0.1',
+            self.qemu_uart_network_port,
+            tools.Timeout_Checker(5))
+
 
     #---------------------------------------------------------------------------
-    def start_proxy(self, cmd_arr, print_log):
+    def start_proxy(self, print_log):
 
+        # QEMU must be running, but not Proxy and the proxy params must exist
+        assert( self.is_qemu_running() )
         assert( not self.is_proxy_running() )
+        assert( self.proxy_cfg_str )
+
+        arr = self.proxy_cfg_str.split(',')
+        proxy_app = arr[0]
+        serial_qemu_connection = arr[1] if (1 != len(arr)) else 'TCP'
+
+        assert(proxy_app is not None )
+        if not os.path.isfile(proxy_app):
+            raise Exception('ERROR: missing proxy app: {}'.format(proxy_app))
+
+        if (serial_qemu_connection != 'TCP'):
+            raise Exception(
+                'ERROR: invalid Proxy/QEMU_connection mode: {}'.format(
+                    serial_qemu_connection))
+
+        # start the bridge between QEMU and the Proxy
+        self.bridge.start_server(self.proxy_network_port)
+
+        # start the proxy and have it connect to the bridge
+        cmd_arr = [
+            proxy_app,
+            '-c', 'TCP:{}'.format(self.proxy_network_port),
+            '-t', '1' # enable TAP
+        ]
 
         self.process_proxy = process_tools.ProcessWrapper(
                                 cmd_arr,
@@ -140,152 +379,22 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.process_proxy.start(print_log)
 
 
-    #---------------------------------------------------------------------------
-    def get_qemu_serial_connection_params(self, serial_qemu_connection):
-
-        if (serial_qemu_connection == 'PTY'):
-
-            # must use '-S' to freeze the QEMU at startup, unfreezing happens
-            # when the other end of PTY is connected
-            return ['-S', '-serial', 'pty']
-
-        elif (serial_qemu_connection == 'TCP'):
-
-            # QEMU will freeze on startup until it can connect to the server
-            return ['-serial', 'tcp:localhost:4444,server']
-
-        else:
-
-            return ['-serial', '/dev/null']
-
-
-    #---------------------------------------------------------------------------
-    def get_qemu_machine_params(self):
-
-        qemu_mapping = {
-            # <plat>: ['<qemu-binary-arch>', '<qemu-machine>'],
-            'imx6':      ['arm',     'sabrelite'],
-            'migv':      ['riscv64', 'virt'],
-            'rpi3':      ['aarch64', 'raspi3'],
-            'spike':     ['riscv64', 'spike_v1.10'],
-            'zynq7000':  ['arm',     'xilinx-zynq-a9'],
-        }.get(self.run_context.platform, None)
-        assert(qemu_mapping is not None)
-
-        return [ 'qemu-system-{}'.format(qemu_mapping[0]),
-                 '-machine', qemu_mapping[1],
-                 '-m', 'size=1024M',
-                 '-nographic']
-
-
-    #---------------------------------------------------------------------------
-    def connect_qemu_serial_to_tcp_socket(self):
-
-        # socket must not be connected
-        assert(self.serial_socket is None)
-
-        self.print('connecting QEMU serial port to TCP socket')
-        self.serial_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serial_socket.connect( ('127.0.0.1', 4444) )
-
-
-    #---------------------------------------------------------------------------
-    def connect_qemu_serial_to_proxy(self, proxy_app, serial_qemu_connection, print_log):
-
-        # QEMU must be running
-        assert( self.is_qemu_running() )
-
-        assert(proxy_app is not None )
-        if not os.path.isfile(proxy_app):
-            raise Exception('ERROR: missing proxy app: {}'.format(proxy_app))
-
-        connection_mode = None
-
-        if (serial_qemu_connection == 'PTY'):
-
-            # search for dev/ptsX info in QEMU's output, it used to be printed
-            # to  stderr but QEMU 4.2 changed it to stdout
-            pattern = re.compile('(\/dev\/pts\/\d)')
-            match = None
-            for filename in [
-                self.process_qemu.log_file_stdout,
-                self.process_qemu.log_file_stderr
-            ]:
-                match = Log_File(filename).find_match_in_lines(
-                            pattern,
-                            tools.Timeout_Checker(5))
-                if match is not None:
-                    break;
-
-            if match is None:
-                raise Exception('ERROR: could not get QEMU''s /dev/ptsX')
-
-            connection_mode = 'PTY:{}'.format(match) # PTY to connect to
-
-        elif (serial_qemu_connection == 'TCP'):
-            connection_mode = 'TCP:4444'
-
-        else:
-            raise Exception(
-                'ERROR: invalid Proxy/QEMU_connection: {}'.format(
-                    serial_qemu_connection))
-
-        # start the proxy
-        assert( connection_mode is not None )
-        cmd_proxy = [
-            proxy_app,
-            '-c', connection_mode,
-            '-t', '1' # enable TAP
-        ]
-
-        self.start_proxy(cmd_proxy, print_log)
-
-        if (serial_qemu_connection == 'PTY'):
-            # QEMU starts up in halted mode, must send the 'c' command to
-            # let it boot the system
-            self.print('releasing QEMU from halt mode')
-            qemu_in = self.process_qemu.process.stdin
-            qemu_in.write(b'c\n')
-            qemu_in.flush()
-
-
     #----------------------------------------------------------------------------
     # interface board_automation.System_Runner
     def do_start(self, print_log):
 
-        serial_qemu_connection = 'TCP'
-        proxy_app = None
+        self.start_qemu(print_log)
+
+        # we used to have a sleep() here to give the QEMU process some fixed
+        # time to start, the value was based on trial and error. However, this
+        # did not really address the core problem in the end. The smarter
+        # approach is forcing everybody interacting with QEMU to come up with
+        # a specific re-try concept and figure out when to give up. This is
+        # also closer to dealing with physical hardware, where failures and
+        # non-responsiveness must be taken into account anywhere.
 
         if self.proxy_cfg_str:
-            arr = self.proxy_cfg_str.split(',')
-            proxy_app = arr[0]
-            if (1 != len(arr)):
-                serial_qemu_connection = arr[1]
-
-        self.start_qemu(serial_qemu_connection, print_log)
-
-        # give QEMU process time to start. Instead of using a fixed value here
-        # that was found by testing, we should use smarter methods an retries
-        # with timeouts to determine if QEMU is working as expected.
-        time.sleep(0.2)
-
-        # either start proxy and connect it to QEMU's serial port or give the
-        # tests access to the serial port for it's own usage.
-        if proxy_app:
-            self.connect_qemu_serial_to_proxy(
-                proxy_app,
-                serial_qemu_connection,
-                print_log)
-        else:
-            self.connect_qemu_serial_to_tcp_socket()
-
-        #self.print('QEMU up and system running')
-
-        # QEMU is starting up now. If some output is redirected to files, they
-        # may not exist until there is some actual output. There is not much
-        # gain if we sleep here hoping the file pop into existence. The caller
-        # should take care of this an deal with cases where the file does not
-        # exists yet.
+            self.start_proxy(print_log)
 
 
     #---------------------------------------------------------------------------
@@ -301,17 +410,16 @@ class QemuProxyRunner(board_automation.System_Runner):
             self.process_proxy.terminate()
             self.process_proxy = None
 
-        if self.serial_socket:
-            self.serial_socket.close()
-            self.serial_socket = None
-
         if self.is_qemu_running():
             #self.print('terminating QEMU...')
             self.process_qemu.terminate()
             self.process_qemu = None
 
+        self.bridge.shutdown()
+
 
     #---------------------------------------------------------------------------
     # interface board_automation.System_Runner
     def get_serial_socket(self):
-        return self.serial_socket
+        return None if self.is_proxy_running() \
+               else self.bridge.get_source_socket()
