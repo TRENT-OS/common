@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
 import sys
+import traceback
 import socket
 import time
 import os
 import subprocess
-import threading
 
 from . import tools
 from . import process_tools
