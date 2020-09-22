@@ -268,17 +268,17 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         qemu_mapping = {
             # <plat>: ['<qemu-binary-arch>', '<qemu-machine>'],
-            'imx6':      ['arm',     'sabrelite'],
-            'migv':      ['riscv64', 'virt'],
-            'rpi3':      ['aarch64', 'raspi3'],
-            'spike':     ['riscv64', 'spike_v1.10'],
-            'zynq7000':  ['arm',     'xilinx-zynq-a9'],
+            'imx6':      ['/opt/hc/bin/qemu-system-arm', 'sabrelite'],
+            'migv':      ['qemu-system-riscv64'        , 'virt'],
+            'rpi3':      ['qemu-system-aarch64'        , 'raspi3'],
+            'spike':     ['qemu-system-riscv64'        , 'spike_v1.10'],
+            'zynq7000':  ['/opt/hc/bin/qemu-system-arm', 'xilinx-zynq-a9'],
         }.get(self.run_context.platform, None)
 
         assert(qemu_mapping is not None)
 
         cmd_arr = [
-            'qemu-system-{}'.format(qemu_mapping[0]),
+            '{}'.format(qemu_mapping[0]),
             '-machine', qemu_mapping[1],
             '-m', 'size=1024M',
             '-nographic',
