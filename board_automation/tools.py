@@ -120,53 +120,55 @@ class Log_File(object):
 
 
     #---------------------------------------------------------------------------
-    def start_monitor(self, printer, checker_func = None):
-
-        # time starts ticking now, since the system is running. The file may
-        # not be created until any data is writte into it, so successfully
-        # opening it can take a while.
-        start = datetime.datetime.now()
-        f_log = self.open_non_blocking(checker_func = checker_func)
-        if not f_log:
-            raise Exception('monitor failed, could not open: {}'.format(self.name))
-
-
-        #-----------------------------------------------------------------------
-        def readline_loop():
-            line = ''
-            while True:
-                # readline() returns a string terminated by "\n" for every
-                # complete line. On timeout (ie. EOF reached), there is no
-                # terminating "\n"
-                # Unfortunately, there is a line break bug in some logs,
-                # where "\n\r" (LF+CR) is used instead of "\r\n" (CR+LF).
-                # Universal newline handling only considers "\r", "\n" and
-                # "\r\n" as line break, thus "\n\r" is taken as two line
-                # breaks and we see a lot of empty lines in the logs
-                line += f_log.readline()
-                if line.endswith('\n'):
-                    return line
-
-                # could not read a complete line, check termination request
-                if checker_func and not checker_func():
-                    return line
-
-                # wait and try again. Using 100 ms seems a good
-                # trade-off here, so we don't block for too long or
-                # cause too much CPU load
-                time.sleep(0.1)
+    def start_monitor(
+            self,
+            printer,
+            timeout = None,
+            checker_func = None):
 
         #-----------------------------------------------------------------------
         def monitoring_thread():
+            # time starts ticking now, since the system is running. The file
+            # may not be created until any data is writte into it, so
+            # successfully opening it can take a while.
+            start = datetime.datetime.now()
+            f_log = self.open_non_blocking(
+                        timeout = timeout,
+                        checker_func = checker_func)
+            if not f_log:
+                raise Exception('monitor failed, could not open: {}'.format(self.name))
+
             with f_log:
                 is_abort = False
                 while not is_abort:
-                    line = readline_loop()
-                    is_abort = not line.endswith('\n')
+                    line = ''
+                    while True:
+                        # readline() returns a string terminated by "\n" for every
+                        # complete line. On timeout (ie. EOF reached), there is no
+                        # terminating "\n"
+                        # Unfortunately, there is a line break bug in some logs,
+                        # where "\n\r" (LF+CR) is used instead of "\r\n" (CR+LF).
+                        # Universal newline handling only considers "\r", "\n" and
+                        # "\r\n" as line break, thus "\n\r" is taken as two line
+                        # breaks and we see a lot of empty lines in the logs
+                        line += f_log.readline()
+                        if line.endswith('\n'):
+                            break
 
-                    printer.print('[{}] {}'.format(
-                        datetime.datetime.now() - start,
-                        line.strip()))
+                        # could not read a complete line, check termination request
+                        if checker_func and not checker_func():
+                            is_abort = True
+                            break
+
+                        # wait and try again. Using 100 ms seems a good
+                        # trade-off here, so we don't block for too long or
+                        # cause too much CPU load
+                        time.sleep(0.1)
+
+                    if (len(line) > 0):
+                        printer.print('[{}] {}'.format(
+                            datetime.datetime.now() - start,
+                            line.strip()))
 
             # printer.print('[{}] monitor terminated for {}'.format(self, self.name))
 
