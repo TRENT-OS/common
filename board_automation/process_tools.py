@@ -10,6 +10,8 @@ import threading
 import time
 import datetime
 
+from . import tools
+
 
 #---------------------------------------------------------------------------
 def execute_os_cmd(
@@ -43,29 +45,6 @@ def execute_os_cmd(
                     print('ERROR: ret={} for: {}'.format(ret, cmd_arr))
 
                 return ret
-
-
-#===============================================================================
-#===============================================================================
-
-class PrintSerializer():
-
-    #---------------------------------------------------------------------------
-    def __init__(self):
-        self.lock = threading.Lock()
-
-    #---------------------------------------------------------------------------
-    def print(self, msg):
-
-        with self.lock:
-            # msg = '[{}] {}'.format(
-            #         msg,
-            #         datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3])
-
-            sys.stdout.write('{}{}'.format(msg, os.linesep))
-            sys.stdout.flush() # ensure things are really written
-
-            #print(msg)
 
 
 #===============================================================================
@@ -107,7 +86,7 @@ class ProcessWrapper:
         self.cmd_arr = cmd_arr
         self.name = self.cmd_arr[0] if name is None else name
 
-        self.printer = printer if printer else PrintSerializer()
+        self.printer = printer if printer else tools.PrintSerializer()
         self.process = None
 
         self.log_file_stdout = log_file_stdout

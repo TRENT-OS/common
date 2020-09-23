@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from . import process_tools
+from . import tools
 from . import board_automation
 from . import automation_QEMU
 
@@ -17,7 +17,7 @@ def get_test_runner(
                     log_dir,
                     platform,
                     system_image,
-                    process_tools.PrintSerializer(),
+                    tools.PrintSerializer(),
                     print_log)
 
     if (platform == 'imx6'):

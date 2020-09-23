@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import sys
 import traceback
 import os
 import fcntl
@@ -49,6 +50,26 @@ def run_in_thread(func):
     t = MyThread()
     t.start()
     return t
+
+
+#===============================================================================
+#===============================================================================
+
+class PrintSerializer():
+
+    #---------------------------------------------------------------------------
+    def __init__(self):
+        self.lock = threading.Lock()
+
+
+    #---------------------------------------------------------------------------
+    def print(self, msg):
+
+        with self.lock:
+            # msg = '[{}] {}'.format(
+            #         msg,
+            #         datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3])
+            print(msg)
 
 
 #===============================================================================
