@@ -38,10 +38,9 @@ class TcpBridge():
 
 
     #---------------------------------------------------------------------------
-    # sub-classes may extend this
     def print(self, msg):
         if self.printer:
-            self.printer.print(msg)
+            self.printer.print('{}: {}'.format(__class__.__name__, msg))
 
 
     #---------------------------------------------------------------------------
