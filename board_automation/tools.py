@@ -319,7 +319,7 @@ class Log_File(object):
             checker_func = None):
 
         #-----------------------------------------------------------------------
-        def monitoring_thread():
+        def monitoring_thread(thread):
             # time starts ticking now, since the system is running. The file
             # may not be created until any data is written into it, so
             # successfully opening it can take a while.
@@ -368,10 +368,7 @@ class Log_File(object):
             # printer.print('[{}] monitor terminated for {}'.format(self, self.name))
 
 
-        self.monitor_thread = threading.Thread(
-                                target = monitoring_thread,
-                                args = ()
-                              ).start()
+        self.monitor_thread = run_in_thread(monitoring_thread)
 
     #---------------------------------------------------------------------------
     @classmethod

@@ -6,7 +6,6 @@ import os
 import signal
 import shutil
 import subprocess
-import threading
 import time
 import datetime
 
@@ -206,36 +205,32 @@ class ProcessWrapper:
                        )
 
         if has_stdout:
-            threading.Thread(
-              target = self.monitor_channel,
-              args = (
-                  self.process.stdout,
-                  self.name,
-                  print_log,
-                  self.log_file_stdout,
-              )
-            ).start()
+            def thread_stdout(thread):
+                self.monitor_channel(
+                    self.process.stdout,
+                    self.name,
+                    print_log,
+                    self.log_file_stdout)
+            tools.run_in_thread(thread_stdout)
 
         if has_stdout:
-            threading.Thread(
-                target = self.monitor_channel,
-                args = (
+            def thread_stderr(thread):
+                self.monitor_channel(
                     self.process.stderr,
                     self.name + '/E',
                     print_log,
-                    self.log_file_stderr,
-                )
-            ).start()
+                    self.log_file_stderr)
+            tools.run_in_thread(thread_stderr)
 
         # set up a termination handler, that does the internal cleanup. This
         # is needed when e.g. our parent process is aborted and thus all child
         # processes are terminated. We need to ensure all our monitoring
         # threads also terminate.
-        def watch_termination():
+        def watch_termination(thread):
             self.process.wait()
             self.terminate()
 
-        threading.Thread(target=watch_termination).start()
+        tools.run_in_thread(watch_termination)
 
 
     #---------------------------------------------------------------------------
