@@ -68,7 +68,7 @@ class TcpBridge():
         # ensure it really terminates
         while True:
             t = self.thread_server
-            if not t or not t.is_alive():
+            if (t is None) or (not t.is_alive()):
                 break;
             t.join(0.1)
 
@@ -88,7 +88,7 @@ class TcpBridge():
         # really terminates
         while True:
             t = self.thread_client
-            if t is None or not t.is_alive():
+            if (t is None) or (not t.is_alive()):
                 break;
             t.join(0.1)
 
