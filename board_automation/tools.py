@@ -167,9 +167,10 @@ class Timeout_Checker(object):
 class Socket_With_Read_Cancellation:
 
     #---------------------------------------------------------------------------
-    def __init__(self, s):
+    def __init__(self, s, printer = None):
 
         self.socket = s
+        self.printer = printer
 
         self.do_cancel_recv = False
         self.do_close = False
@@ -199,6 +200,12 @@ class Socket_With_Read_Cancellation:
                     callback(key.fileobj, mask)
 
         self.thread = run_in_thread(my_thread)
+
+
+    #---------------------------------------------------------------------------
+    def print(self, msg):
+        if self.printer:
+            self.printer.print('{}: {}'.format(__class__.__name__, msg))
 
 
     #---------------------------------------------------------------------------

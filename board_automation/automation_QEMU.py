@@ -126,7 +126,8 @@ class TcpBridge():
             raise Exception('no connected to any server')
 
         self.socket_client = tools.Socket_With_Read_Cancellation(
-                                self.socket_client)
+                                self.socket_client,
+                                self.printer)
 
         def socket_forwarder_loop(f_get_socket_src, f_get_socket_dst):
 
