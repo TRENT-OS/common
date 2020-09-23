@@ -90,7 +90,6 @@ class TcpBridge():
             t = self.thread_client
             if t is None or not t.is_alive():
                 break;
-            self.print('join...')
             t.join(0.1)
 
 
