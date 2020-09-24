@@ -172,34 +172,10 @@ class Socket_With_Read_Cancellation:
         self.socket = s
         self.printer = printer
 
-        self.do_cancel_recv = False
-        self.do_close = False
-        self.recv_or_cancel_event = threading.Event()
-        self.recv_cancel_done = threading.Event()
+        self.recv_or_cancel_event = None
+        self.lock = threading.Lock()
+        self.recv_lock = threading.Lock()
 
-        self.sel = selectors.DefaultSelector()
-
-        def cb_read(s, mask):
-            e = self.recv_or_cancel_event
-            if e is not None:
-                e.set()
-
-        self.sel.register(self.socket, selectors.EVENT_READ, cb_read)
-
-        def my_thread(thread):
-            while not self.do_cancel_recv:
-                events = self.sel.select()
-                # seems there can be spurious events, as events is an empty
-                # list sometimes. Furthermore, it seems that unregistering a
-                # callback also triggers select() to return an event, thus
-                # is appears we never get stuck here and always terminate the
-                # thread if we can ensure do_cancel_recv is set to False prior
-                # to unregistering callbacks
-                for key, mask in events:
-                    callback = key.data
-                    callback(key.fileobj, mask)
-
-        self.thread = run_in_thread(my_thread)
 
 
     #---------------------------------------------------------------------------
@@ -215,50 +191,57 @@ class Socket_With_Read_Cancellation:
 
     #---------------------------------------------------------------------------
     def cancel_recv(self, timeout = Timeout_Checker.infinite()):
-        self.do_cancel_recv = True
 
-        e = self.recv_or_cancel_event
-        if e is None:
-            return True
+        with self.lock:
 
-        e.set()
-
-        e_timeout = 0 if timeout is None \
-                    else None if timeout.is_infinite() \
-                    else timeout.get_remaining()
-
-        return self.recv_cancel_done.wait(e_timeout)
+            if self.recv_or_cancel_event is not None:
+                self.do_cancel_recv = True
+                self.recv_or_cancel_event.set()
 
 
     #---------------------------------------------------------------------------
     def recv(self, buffer_size):
 
-        if self.do_cancel_recv:
-            return None
+        # only one thread can receive at a time
+        with self.recv_lock:
 
-        e = self.recv_or_cancel_event
-        if e is None:
-            return None
+            def cb_read(s, mask):
+                self.recv_or_cancel_event.set()
 
-        e.wait()
 
-        if not self.do_cancel_recv:
-            ret = self.socket.recv(buffer_size)
-            if ret:
-                return ret
-            # seem the socket has been closed, ensure we shut down
-            self.do_cancel_recv = True
+            def socket_event_thread(thread):
+                while not self.do_cancel_recv:
 
-        # read has been cancelled or socket closed.
-        self.recv_or_cancel_event = None
-        self.sel.unregister(self.socket)
+                    events = self.sel.select()
+                    # seems there can be spurious events, as events is an empty
+                    # list sometimes. Furthermore, it seems that unregistering
+                    # a callback also triggers select() to return an event,
+                    # thus is appears we never get stuck here and always
+                    # terminate the thread if we can ensure do_cancel_recv is
+                    # set to False prior to unregistering callbacks
+                for key, mask in events:
+                    callback = key.data
+                    callback(key.fileobj, mask)
 
-        if self.do_close:
-            self.socket.close()
 
-        self.recv_cancel_done.set()
+            sel = selectors.DefaultSelector()
 
-        return None
+            with self.lock:
+                if self.do_cancel_recv:
+                    return None
+                self.recv_cancel_done_event = threading.Event()
+                sel.register(self.socket, selectors.EVENT_READ, cb_read)
+                run_in_thread(socket_event_thread)
+
+            self.recv_or_cancel_event.wait()
+
+            with self.lock:
+                self.recv_or_cancel_event = None
+                sel.unregister(self.socket)
+                if self.do_cancel_recv:
+                    return None
+                # this is guaranteed not to block
+                return self.socket.recv(buffer_size)
 
 
     #---------------------------------------------------------------------------
@@ -272,9 +255,8 @@ class Socket_With_Read_Cancellation:
 
 
     #---------------------------------------------------------------------------
-    def close(self, timeout = Timeout_Checker.infinite() ):
-        self.do_close = True
-        return self.cancel_recv(timeout)
+    def close(self):
+        self.socket.close()
 
 
 
