@@ -255,6 +255,11 @@ class Socket_With_Read_Cancellation:
 
 
     #---------------------------------------------------------------------------
+    def shutdown(self, how):
+        self.socket.shutdown(how)
+
+
+    #---------------------------------------------------------------------------
     def close(self):
         self.socket.close()
 

@@ -48,11 +48,19 @@ class TcpBridge():
         s = self.server_socket_client
         self.server_socket_client = None
         if s:
+            # call shutdown() here to ensure any pending accept() fails with
+            # an exception. Without calling it this, accept() just keeps
+            # blocking
+            s.shutdown(socket.SHUT_RDWR)
             s.close()
 
         s = self.server_socket
         self.server_socket = None
         if s:
+            # call shutdown() here to ensure any pending accept() fails with
+            # an exception. Without calling it this, accept() just keeps
+            # blocking
+            s.shutdown(socket.SHUT_RDWR)
             s.close()
 
 
