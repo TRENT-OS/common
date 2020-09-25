@@ -38,16 +38,37 @@ import re
 #      self.thread = threading.Thread(target = my_thread)
 #      self.thread.start()
 #
+
+#===============================================================================
+#===============================================================================
+class MyThread(threading.Thread):
+
+    #---------------------------------------------------------------------------
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+
+    #---------------------------------------------------------------------------
+    def __str__(self):
+        return '{}/{}()'.format(self.name, self.func.__name__)
+
+
+    #---------------------------------------------------------------------------
+    def run(self):
+        try:
+            self.func(self)
+        except: # catch really *all* exceptions
+            (e_type, e_value, e_tb) = sys.exc_info()
+            print('EXCEPTION in thread {}: {}{}'.format(
+                self,
+                ''.join(traceback.format_exception_only(e_type, e_value)),
+                ''.join(traceback.format_tb(e_tb))))
+
+
+#-------------------------------------------------------------------------------
 def run_in_thread(func):
-
-    class MyThread(threading.Thread):
-
-        #-----------------------------------------------------------------------
-        def run(self):
-            func(self)
-
-
-    t = MyThread()
+    t = MyThread(func)
     t.start()
     return t
 
