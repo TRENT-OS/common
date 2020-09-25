@@ -147,10 +147,10 @@ class TcpBridge():
                 except:
                     # something went wrong while waiting for data. We don't
                     # really care what exactly this is and simply exit the loop
-                    exc_info = sys.exc_info()
-                    msg = exc_info[1]
-                    self.print('socket exception: {}'.format(msg))
-                    traceback.print_exception(*exc_info)
+                    (e_type, e_value, e_tb) = sys.exc_info()
+                    print('EXCEPTION in socket recv(): {}{}'.format(
+                        ''.join(traceback.format_exception_only(e_type, e_value)),
+                        ''.join(traceback.format_tb(e_tb))))
                     break
 
                 if not data:
@@ -174,12 +174,14 @@ class TcpBridge():
 
         # start reader thread
         def bridge_thread_client(thread):
-            socket_forwarder_loop(
-                lambda: self.socket_client,
-                lambda: self.server_socket_client)
-            # we do not close the socket here, this will happen in the cleanup
-            # eventually. Until then, the socket can still be used
-            self.thread_client = None
+            try:
+                socket_forwarder_loop(
+                    lambda: self.socket_client,
+                    lambda: self.server_socket_client)
+                # we do not close the socket here, this will happen in the cleanup
+                # eventually. Until then, the socket can still be used
+            finally:
+                self.thread_client = None
 
 
         self.thread_client = tools.run_in_thread(bridge_thread_client)
@@ -196,15 +198,25 @@ class TcpBridge():
         self.server_socket = s
 
         def bridge_thread_server(thread):
-            (self.server_socket_client, addr) = self.server_socket.accept()
-            self.print('bridge server connection from {}'.format(addr[0]))
-            with self.server_socket_client:
-                socket_forwarder_loop(
-                    lambda: self.server_socket_client,
-                    lambda: self.socket_client)
-            # if the thread terminated, close all server sockets
-            self.close_server_sockets()
-            self.thread_server = None
+            try:
+                is_error = False
+                try:
+                    (self.server_socket_client, addr) = self.server_socket.accept()
+                except:
+                    (e_type, e_value, e_tb) = sys.exc_info()
+                    print('EXCEPTION in socket accept(): {}{}'.format(
+                        ''.join(traceback.format_exception_only(e_type, e_value)),
+                        ''.join(traceback.format_tb(e_tb))))
+                    is_error = True
+
+                if not is_error:
+                    socket_forwarder_loop(
+                        lambda: self.server_socket_client,
+                        lambda: self.socket_client)
+            finally:
+                # if the thread terminated, close all server sockets
+                self.close_server_sockets()
+                self.thread_server = None
 
         self.thread_server = tools.run_in_thread(bridge_thread_server)
 
