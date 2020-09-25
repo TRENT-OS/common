@@ -173,7 +173,7 @@ class TcpBridge():
 
 
         # start reader thread
-        def my_thread_client(thread):
+        def bridge_thread_client(thread):
             socket_forwarder_loop(
                 lambda: self.socket_client,
                 lambda: self.server_socket_client)
@@ -182,7 +182,7 @@ class TcpBridge():
             self.thread_client = None
 
 
-        self.thread_client = tools.run_in_thread(my_thread_client)
+        self.thread_client = tools.run_in_thread(bridge_thread_client)
 
         peer = ('127.0.0.1', port)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -195,7 +195,7 @@ class TcpBridge():
 
         self.server_socket = s
 
-        def my_thread_server(thread):
+        def bridge_thread_server(thread):
             (self.server_socket_client, addr) = self.server_socket.accept()
             self.print('bridge server connection from {}'.format(addr[0]))
             with self.server_socket_client:
@@ -206,7 +206,7 @@ class TcpBridge():
             self.close_server_sockets()
             self.thread_server = None
 
-        self.thread_server = tools.run_in_thread(my_thread_server)
+        self.thread_server = tools.run_in_thread(bridge_thread_server)
 
 
     #---------------------------------------------------------------------------
