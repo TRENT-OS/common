@@ -187,10 +187,13 @@ class Socket_With_Read_Cancellation:
 
         def my_thread(thread):
             while not self.do_cancel_recv:
-                # seem unregistering a callback also triggers an event, thus we
-                # never get stuck here if we can ensure do_cancel_recv is set
-                # to Falso prior to unregistering.
                 events = self.sel.select()
+                # seems there can be spurious events, as events is an empty
+                # list sometimes. Furthermore, it seems that unregistering a
+                # callback also triggers select() to return an event, thus
+                # is appears we never get stuck here and always terminate the
+                # thread if we can ensure do_cancel_recv is set to False prior
+                # to unregistering callbacks
                 for key, mask in events:
                     callback = key.data
                     callback(key.fileobj, mask)
