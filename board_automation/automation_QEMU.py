@@ -3,6 +3,7 @@
 import sys
 import traceback
 import socket
+import selectors
 import time
 import os
 import subprocess
@@ -23,10 +24,8 @@ class TcpBridge():
 
         self.printer = printer
 
-        self.thread_client = None
         self.socket_client = None
 
-        self.thread_server = None
         self.server_socket = None
         self.server_socket_client = None
 
@@ -36,6 +35,30 @@ class TcpBridge():
         # - seL4/CAmkES based systems often use shared buffers of 4 KiByte.
         self.buffer_size = 8192
 
+        self.sel = selectors.DefaultSelector()
+
+        #-----------------------------------------------------------------------
+        def socket_event_thread(thread):
+
+            # this is a daemon thread that will be killed automatically when
+            # the main thread dies. Thus there is no abnort mechanism here
+            while True:
+
+                for key, mask in self.sel.select():
+
+                    #self.print('callback {} {}'.format(key, mask))
+                    callback = key.data
+
+                    try:
+                        callback(key.fileobj, mask)
+                    except:
+                        (e_type, e_value, e_tb) = sys.exc_info()
+                        print('EXCEPTION in socket recv(): {}{}'.format(
+                            ''.join(traceback.format_exception_only(e_type, e_value)),
+                            ''.join(traceback.format_tb(e_tb))))
+
+        tools.run_in_daemon_thread(socket_event_thread)
+
 
     #---------------------------------------------------------------------------
     def print(self, msg):
@@ -44,34 +67,22 @@ class TcpBridge():
 
 
     #---------------------------------------------------------------------------
-    def close_server_sockets(self):
-        s = self.server_socket_client
-        self.server_socket_client = None
-        if s:
-            s.close()
-
-        s = self.server_socket
-        self.server_socket = None
-        if s:
-            s.close()
-
-
-    #---------------------------------------------------------------------------
     def stop_server(self):
 
-        if self.thread_server is None:
+        socket_srv = self.server_socket
+        if socket_srv is None:
+            # there is no server running
             return
 
-        self.close_server_sockets()
-        # since we have closed server_socket_client, the thread can't get more
-        # input and is expected to terminate. This is just a safe-guard to
-        # ensure it really terminates - and if it does not terminate, we see
-        # this because thing are stuck here
-        while True:
-            t = self.thread_server
-            if not t or not t.is_alive():
-                break;
-            t.join(0.1)
+        self.server_socket = None
+        self.sel.unregister(socket_srv)
+
+        socket_src_cli = self.server_socket_client
+        if socket_src_cli is not None:
+            self.server_socket_client = None
+            socket_src_cli.close()
+
+        socket_srv.close()
 
 
     #---------------------------------------------------------------------------
@@ -80,23 +91,55 @@ class TcpBridge():
         self.stop_server()
 
         s = self.socket_client
-        self.socket_client = None
-        if s:
+        if s is not None:
+            self.socket_client = None
             s.close()
 
-        # since we have closed the socket_client, the thread can't get more
-        # input and is expected to terminate. This is just a safe-guard to
-        # ensure it really terminates - and if it does not terminate, we see
-        # this because thing are stuck here
-        while True:
-            t = self.thread_client
-            if t is None or not t.is_alive():
-                break;
-            self.print('join...')
-            t.join(0.1)
+
+    #-----------------------------------------------------------------------
+    # this callback is invoked when there is data to be read from the
+    # server
+    def callback_socket_read(
+            self,
+            sock,
+            mask,
+            cb_exp_src,
+            cb_exp_dst,
+            cb_closed):
+
+
+        socket_src = cb_exp_src()
+        if not socket_src:
+            return
+
+        if (sock != socket_src):
+            return
+
+        # read data from the socket. Since we are in a callback for a read
+        # event, this is not supposed to block even if we use blocking sockets.
+        # If we read no data, this means the socket has been closed. Note that
+        # a non-blocking socket behaves in the same way, it throws an exception
+        # if there is no data to read.
+        data = None
+        try:
+            data = sock.recv(self.buffer_size)
+        except ConnectionResetError:
+            # socket already closed
+            data = None
+
+        if not data:
+            cb_closed(sock)
+            return
+
+        socket_dst = cb_exp_dst()
+        if not socket_dst:
+            return
+
+        socket_dst.sendall(data)
 
 
     #---------------------------------------------------------------------------
+    # connect the bridge to a server
     def connect_to_server(self, addr, port, timeout = None):
 
         peer = (addr, port)
@@ -121,94 +164,69 @@ class TcpBridge():
         self.print('TCP connection established to {}:{}'.format(addr, port))
         self.socket_client = s
 
+        #-----------------------------------------------------------------------
+        def cb_closed(sock):
+            self.sel.unregister(sock)
+            self.socket_client = None
+
+
+        #-----------------------------------------------------------------------
+        def cb_read(sock, mask):
+            self.callback_socket_read(
+                sock,
+                mask,
+                lambda: self.socket_client,
+                lambda: self.server_socket_client,
+                cb_closed)
+
+        self.sel.register(s, selectors.EVENT_READ, cb_read)
+
 
     #---------------------------------------------------------------------------
     def start_server(self, port):
 
-        if self.socket_client is None:
-            raise Exception('no connected to any server')
-
-        self.socket_client = tools.Socket_With_Read_Cancellation(
-                                self.socket_client)
-
-        def socket_forwarder_loop(f_get_socket_src, f_get_socket_dst):
-
-            cnt = 0
-            max_pck = 0
-
-            while True:
-
-                socket_src = f_get_socket_src()
-                if not socket_src:
-                    # seem somebody wants to stop the loop
-                    break
-
-                data = None
-                try:
-                    data = socket_src.recv(self.buffer_size)
-                except:
-                    # something went wrong while waiting for data. We don't
-                    # really care what exactly this is and simply exit the loop
-                    exc_info = sys.exc_info()
-                    msg = exc_info[1]
-                    self.print('socket exception: {}'.format(msg))
-                    traceback.print_exception(*exc_info)
-                    break
-
-                if not data:
-                    # seems the socket got closed
-                    break
-
-                l = len(data)
-                cnt += l
-                if (l > max_pck):
-                    max_pck = l
-
-                socket_dst = f_get_socket_dst()
-                if not socket_dst:
-                    self.print('missing output socket, dropping {} bytes'.format(l))
-                else:
-                    socket_dst.sendall(data)
-
-            # self.print('input socket closed, cnt={}, max_pck={}, terminating'.format(cnt, max_pck))
+        #-----------------------------------------------------------------------
+        def cb_closed(sock):
+            self.sel.unregister(sock)
+            self.server_socket_client = None
 
 
-
-        # start reader thread
-        def my_thread_client(thread):
-            socket_forwarder_loop(
+        #-----------------------------------------------------------------------
+        def cb_read(sock, mask):
+            self.callback_socket_read(
+                sock,
+                mask,
+                lambda: self.server_socket_client,
                 lambda: self.socket_client,
-                lambda: self.server_socket_client)
-            # we do not close the socket here, this will happen in the cleanup
-            # eventually. Until then, the socket can still be used
-            self.thread_client = None
+                cb_closed)
 
 
-        self.thread_client = tools.run_in_thread(my_thread_client)
+        #-----------------------------------------------------------------------
+        def cb_accept(sock, mask):
+            if self.server_socket != sock:
+                return
+
+            (s, addr) = sock.accept()
+            self.print('connection from {}'.format(addr))
+            self.server_socket_client = s
+            self.sel.register(s, selectors.EVENT_READ, cb_read)
+
+
+        if self.socket_client is None:
+            raise Exception('not connected to any server')
 
         peer = ('127.0.0.1', port)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.bind(peer)
-            s.listen()
         except:
             s.close()
-            raise Exception('could not connect to {}:{}'.format(addr, port))
+            raise Exception('could not create server socket on port {}'.format(port))
 
         self.server_socket = s
+        s.listen(0)
 
-        def my_thread_server(thread):
-            (self.server_socket_client, addr) = self.server_socket.accept()
-            self.print('bridge server connection from {}'.format(addr[0]))
-            with self.server_socket_client:
-                socket_forwarder_loop(
-                    lambda: self.server_socket_client,
-                    lambda: self.socket_client)
-            # if the thread terminated, close all server sockets
-            self.close_server_sockets()
-            self.thread_server = None
-
-        self.thread_server = tools.run_in_thread(my_thread_server)
+        self.sel.register(s, selectors.EVENT_READ, cb_accept)
 
 
     #---------------------------------------------------------------------------
@@ -216,18 +234,23 @@ class TcpBridge():
     # implies shutting it down
     def get_source_socket(self):
 
-        if self.thread_client is not None:
+        self.stop_server()
 
-            self.stop_server()
-            # unblock any pending socket read operation
-            self.socket_client.cancel_recv()
-            # wait until the thread has died
-            while self.thread_client is not None:
-                time.sleep(0.1)
+        sock = self.socket_client
+        if sock is None:
+            return None
 
-            self.socket_client = self.socket_client.get_socket()
+        # unregistering throws a KeyError exception if the socket is not
+        # registered. This can happen, because get_source_socket() may be
+        # called multiple times during a test run.
+        try:
+            self.sel.unregister(sock)
+        except KeyError:
+            # if source_socket() has been called before, the socket was already
+            # unregistered then. So we can ignore this exception.
+            pass
 
-        return self.socket_client
+        return sock
 
 
 #===============================================================================

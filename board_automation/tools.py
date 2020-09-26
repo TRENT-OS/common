@@ -44,8 +44,8 @@ import re
 class MyThread(threading.Thread):
 
     #---------------------------------------------------------------------------
-    def __init__(self, func):
-        super().__init__()
+    def __init__(self, func, daemon=None):
+        super().__init__(daemon=daemon)
         self.func = func
 
 
@@ -69,6 +69,12 @@ class MyThread(threading.Thread):
 #-------------------------------------------------------------------------------
 def run_in_thread(func):
     t = MyThread(func)
+    t.start()
+    return t
+
+#-------------------------------------------------------------------------------
+def run_in_daemon_thread(func):
+    t = MyThread(func, daemon=True)
     t.start()
     return t
 
@@ -159,113 +165,6 @@ class Timeout_Checker(object):
             timeout = min(timeout, timeout_remining)
 
         time.sleep(timeout)
-
-
-#===============================================================================
-#===============================================================================
-
-class Socket_With_Read_Cancellation:
-
-    #---------------------------------------------------------------------------
-    def __init__(self, s):
-
-        self.socket = s
-
-        self.do_cancel_recv = False
-        self.do_close = False
-        self.recv_or_cancel_event = threading.Event()
-        self.recv_cancel_done = threading.Event()
-
-        self.sel = selectors.DefaultSelector()
-
-        def cb_read(s, mask):
-            e = self.recv_or_cancel_event
-            if e is not None:
-                e.set()
-
-        self.sel.register(self.socket, selectors.EVENT_READ, cb_read)
-
-        def my_thread(thread):
-            while not self.do_cancel_recv:
-                # seem unregistering a callback also triggers an event, thus we
-                # never get stuck here if we can ensure do_cancel_recv is set
-                # to Falso prior to unregistering.
-                events = self.sel.select()
-                for key, mask in events:
-                    callback = key.data
-                    callback(key.fileobj, mask)
-
-        self.thread = run_in_thread(my_thread)
-
-
-    #---------------------------------------------------------------------------
-    def get_socket(self):
-        return self.socket
-
-
-    #---------------------------------------------------------------------------
-    def cancel_recv(self, timeout = Timeout_Checker.infinite()):
-        self.do_cancel_recv = True
-
-        e = self.recv_or_cancel_event
-        if e is None:
-            return True
-
-        e.set()
-
-        e_timeout = 0 if timeout is None \
-                    else None if timeout.is_infinite() \
-                    else timeout.get_remaining()
-
-        return self.recv_cancel_done.wait(e_timeout)
-
-
-    #---------------------------------------------------------------------------
-    def recv(self, buffer_size):
-
-        if self.do_cancel_recv:
-            return None
-
-        e = self.recv_or_cancel_event
-        if e is None:
-            return None
-
-        e.wait()
-
-        if not self.do_cancel_recv:
-            ret = self.socket.recv(buffer_size)
-            if ret:
-                return ret
-            # seem the socket has been closed, ensure we shut down
-            self.do_cancel_recv = True
-
-        # read has been cancelled or socket closed.
-        self.recv_or_cancel_event = None
-        self.sel.unregister(self.socket)
-
-        if self.do_close:
-            self.socket.close()
-
-        self.recv_cancel_done.set()
-
-        return None
-
-
-    #---------------------------------------------------------------------------
-    def send(self, buffer):
-        return self.socket.send(buffer)
-
-
-    #---------------------------------------------------------------------------
-    def sendall(self, buffer):
-        return self.socket.sendall(buffer)
-
-
-    #---------------------------------------------------------------------------
-    def close(self, timeout = Timeout_Checker.infinite() ):
-        self.do_close = True
-        return self.cancel_recv(timeout)
-
 
 
 #===============================================================================
