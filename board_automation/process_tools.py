@@ -249,7 +249,7 @@ class ProcessWrapper:
             ).start()
 
         # set up a termination handler, that does the internal cleanup. This
-        # is needed then e.g. our parent process is aborted and thus all child
+        # is needed when e.g. our parent process is aborted and thus all child
         # processes are terminated. We need to ensure all our monitoring
         # threads also terminate.
         def watch_termination():

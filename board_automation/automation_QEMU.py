@@ -213,7 +213,8 @@ class TcpBridge():
 
 
     #---------------------------------------------------------------------------
-    # if start_server() is not used, this will release the source socket
+    # get the QEMU serial port socket, if the TCP bridge is running this
+    # implies shutting it down
     def get_source_socket(self):
 
         if self.thread_client is not None:

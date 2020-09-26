@@ -278,7 +278,7 @@ class Log_File(object):
         #-----------------------------------------------------------------------
         def monitoring_thread():
             # time starts ticking now, since the system is running. The file
-            # may not be created until any data is writte into it, so
+            # may not be created until any data is written into it, so
             # successfully opening it can take a while.
             start = datetime.datetime.now()
             f_log = self.open_non_blocking(
