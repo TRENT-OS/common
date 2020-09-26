@@ -65,8 +65,7 @@ class TcpBridge():
         self.close_server_sockets()
         # since we have closed server_socket_client, the thread can't get more
         # input and is expected to terminate. This is just a safe-guard to
-        # ensure it really terminates - and if it does not terminate, we see
-        # this because thing are stuck here
+        # ensure it really terminates
         while True:
             t = self.thread_server
             if not t or not t.is_alive():
@@ -84,10 +83,9 @@ class TcpBridge():
         if s:
             s.close()
 
-        # since we have closed the socket_client, the thread can't get more
-        # input and is expected to terminate. This is just a safe-guard to
-        # ensure it really terminates - and if it does not terminate, we see
-        # this because thing are stuck here
+        # since we have closed socket_client, the thread can't get more input
+        # and is expected to terminate. This is just a safe-guard to ensure it
+        # really terminates
         while True:
             t = self.thread_client
             if t is None or not t.is_alive():
