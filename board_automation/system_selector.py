@@ -5,6 +5,8 @@ from . import board_automation
 from . import automation_QEMU
 from . import automation_SabreLite
 from . import automation_SabreLite_boardSetup
+from . import automation_RasPi
+from . import automation_RasPi_boardSetup
 
 
 #-------------------------------------------------------------------------------
@@ -42,7 +44,10 @@ def get_test_runner(
                         proxy_config)
 
     elif (platform == 'rpi3'):
-        pytest.fail('implement me: {}'.format(platform))
+        return automation_RasPi.boardRunner_RasPi(
+                        run_context,
+                        automation_RasPi_boardSetup.Board_Setup_RasPi(
+                            run_context.printer))
 
     else:
         raise Exception('unsupported platform: {}'.format(platform))
