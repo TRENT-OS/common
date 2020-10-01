@@ -310,7 +310,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         qemu_mapping = {
             # <plat>: ['<qemu-binary-arch>', '<qemu-machine>'],
-            'imx6':      ['/opt/hc/bin/qemu-system-arm', 'sabrelite'],
+            'sabre':     ['/opt/hc/bin/qemu-system-arm', 'sabrelite'],
             'migv':      ['qemu-system-riscv64'        , 'virt'],
             'rpi3':      ['qemu-system-aarch64'        , 'raspi3'],
             'spike':     ['qemu-system-riscv64'        , 'spike_v1.10'],
