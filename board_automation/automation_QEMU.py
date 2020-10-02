@@ -255,8 +255,16 @@ class TcpBridge():
 
 #===============================================================================
 #===============================================================================
+import threading
 
 class QemuProxyRunner(board_automation.System_Runner):
+    # to allow multi instance of this class we need to avoid insisting on the
+    # same port. Therefore a base is established here but the port number used
+    # is calculated every time an instance gets created (see code below). At the
+    # moment we can consider this as a workaround. In the future we will
+    # implement a different way of communication for qemu (see SEOS-1845)
+    qemu_uart_network_port  = 4444
+    port_cnt_lock = threading.Lock()
 
     #---------------------------------------------------------------------------
     def __init__(self, run_context, proxy_cfg_str = None):
@@ -269,11 +277,15 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.bridge = TcpBridge(self.run_context.printer)
 
         self.process_qemu = None
-        self.qemu_uart_network_port = 4444
-
         self.process_proxy = None
-        self.proxy_network_port = 4445
 
+        QemuProxyRunner.port_cnt_lock.acquire()
+        base_port = QemuProxyRunner.qemu_uart_network_port
+        QemuProxyRunner.qemu_uart_network_port += 2
+        QemuProxyRunner.port_cnt_lock.release()
+
+        self.qemu_uart_network_port = base_port
+        self.proxy_network_port     = base_port + 1
 
     #---------------------------------------------------------------------------
     def is_qemu_running(self):
