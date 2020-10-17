@@ -543,15 +543,22 @@ class QemuProxyRunner(board_automation.System_Runner):
                 for p in self.serial_ports:
                     cmd_arr += ['-serial', p if p else 'null']
 
-                # connect all NICs to existing TAPx devices
-                for tap_nic in self.nics:
-                    self.add_device('-nic', 'tap', {
-                        'ifname': tap_nic,
-                        'script': 'no'
-                    })
+                # Avoid an error message on the ARM virt platform that the
+                # device "virtio-net-pci" init fails due to missing ROM file
+                # "efi-virtio.rom".
+                if 'virt' == self.machine:
+                    # ToDo: check virt platform of other architectures
+                    assert(self.cpu.startswith('cortex-a'))
+                    cmd_arr += ['-nic', 'none']
+                else:
+                    for tap_nic in self.nics:
+                        self.add_device('-nic', 'tap', {
+                            'ifname': tap_nic,
+                            'script': 'no'
+                        })
 
                 if self.sd_card_image:
-                    if (self.machine in ['spike', 'sifive_u', 'mig-v']):
+                    if (self.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
                         if printer:
                             printer.print(
                                 'QEMU: ignoring SD card, not supported for {}'.format(
@@ -721,6 +728,9 @@ class QemuProxyRunner(board_automation.System_Runner):
                                     os.path.join(self.run_context.resource_dir, 'zcu102_sd_card'),
                                     self.run_context.log_dir
                                 ]),
+            'qemu-arm-virt-a15':  QemuMachineCfg(qemu_aarch32, ['virt', 'cortex-a15', 2048]),
+            'qemu-arm-virt-a53':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a53', 2048]),
+            'qemu-arm-virt-a57':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a57', 2048]),
         }
 
         selected_cfg = qemu_cfgs.get(self.run_context.platform, None)

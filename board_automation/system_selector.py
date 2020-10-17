@@ -22,9 +22,15 @@ def get_test_runner(
         print_log = False ):
 
     # translate generic platform names
-    if (platform == 'spike'):
-        print('translating PLATFORM: spike -> spike64')
-        platform = 'spike64'
+    translation_table = {
+        'spike': 'spike64',
+        'qemu-arm-virt': 'qemu-arm-virt-a53'
+    }
+    new_plat = translation_table.get(platform, None)
+    if new_plat is not None:
+        print('translating PLATFORM: {} -> {}'.format(platform, new_plat))
+        platform = new_plat
+
 
     run_context = board_automation.Run_Context(
                     log_dir,
@@ -42,7 +48,10 @@ def get_test_runner(
             'spike32',
             'spike64',
             'hifive',
-            'migv_qemu']):
+            'migv_qemu',
+            'qemu-arm-virt-a15',
+            'qemu-arm-virt-a53',
+            'qemu-arm-virt-a57']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config,
