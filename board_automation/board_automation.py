@@ -133,13 +133,12 @@ class System_Runner(object):
 
             # the CapDL Loader runs a as root task. It should run immediately,
             # so 2 secs should do.
-            #( [ 'Starting CapDL Loader...' ], 2),
+            ( [ 'Starting CapDL Loader...' ], 2),
 
             # it takes some time for the CapDL Loader to set up the system,
             # especially if there is a lot of output on the UART, where the
             # baudrate setting slows things down. So let's give it 20 seconds.
-            #( [ 'CapDL Loader done, suspending...' ], 20),
-            ( [ 'Done; suspending...' ], 20),
+            ( [ 'CapDL Loader done, suspending...' ], 20),
         ])
 
         if not ret:
