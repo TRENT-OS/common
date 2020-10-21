@@ -154,13 +154,13 @@ class Relay_Board:
       separate power source. Connect VCC to the I/O board's VCC
 
 
-                  +-------------+
-                  | optocoupler |
-        o-- VCC --|...       ...|------- JD-VCC --o
-                  | LED  =>  |  |           |
-        o-- IO --+....       ...|---+    Relais --Transistor --- GND --o
-                  |             |   |                  |
-                  +-------------+   +------------------+
+                  +-------------+   +----------------------+-- JD-VCC --o
+                  | optocoupler |   |                      |
+        o-- VCC --|...       ...|---+        Relais -- R --+
+                  | LED  =>  |  |              |
+        o-- IO --+....       ...|--- R --- Transistor
+                  |             |              |
+                  +-------------+              +----------------- GND --o
     """
 
 
@@ -204,7 +204,7 @@ class Relay_Board:
     #---------------------------------------------------------------------------
     def apply_state(self):
         # self.print('relay mask 0x{:02x}'.format(m))
-        # pulling an I/O down switched the relay on. We support 8 relays
+        # pulling an I/O down switches the relay on. We support 8 relays
         self.gpio.write(~self.state & 0xFF)
 
 
