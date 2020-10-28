@@ -27,16 +27,15 @@ def get_test_runner(
                     print_log)
 
     if (platform == 'sabre'):
+        return automation_QEMU.QemuProxyRunner(
+                        run_context,
+                        proxy_config)
+
+    if (platform == 'sabre-hw'):
         return automation_SabreLite.boardRunner_SabreLite(
                         run_context,
                         automation_SabreLite_boardSetup.Board_Setup_SabreLite(
                             run_context.printer))
-
-    if (platform in ['imx6', 'qemu-sabre']):
-        run_context.platform='sabre'
-        return automation_QEMU.QemuProxyRunner(
-                        run_context,
-                        proxy_config)
 
     elif (platform == 'zynq7000'):
         return automation_QEMU.QemuProxyRunner(
