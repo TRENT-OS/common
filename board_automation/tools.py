@@ -257,22 +257,22 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
-    def has_expired(self):
-        return (not self.is_infinite()) and (time.time() >= self.time_end)
-
-
-    #---------------------------------------------------------------------------
     # this returns a value greater or equal zero, negative values indicate that
     # the timeout is infinite
     def get_remaining(self):
+
         if self.is_infinite():
             return -1
 
         time_now = time.time()
-        if (time_now >= self.time_end):
-            return 0
+        return (self.time_end - time_now) if (self.time_end > time_now) else 0
 
-        return self.time_end - time_now
+
+    #---------------------------------------------------------------------------
+    def has_expired(self):
+        v = self.get_remaining()
+        assert( (v == -1 and self.is_infinite()) or (v >= 0))
+        return (0 == v)
 
 
     #---------------------------------------------------------------------------
