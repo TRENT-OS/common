@@ -279,20 +279,33 @@ class Timeout_Checker(object):
     # sleep either for the given time if larger than the remaining time in the
     # timeout. Otherwise sleep for the remaining time in the timeout only.
     def sleep(self, timeout):
-        assert( timeout > 0 )
 
-        if not self.is_infinite():
+        if (timeout is None):
+            # we don't handle None as 0, because if we see None here this is
+            # likely a bug in the caller's code.
+            raise Exception('can''t sleep() for timeout "None"')
 
-            timeout_remining = self.get_remaining()
+        elif isinstance(timeout, Timeout_Checker):
+            timeout = None if timeout.is_infinite() else self.get_remaining()
 
-            # don't sleep at all if there is no time left
-            if (0 == timeout_remining):
-                return
+        elif (timeout < 0):
+            raise Exception('can''t sleep() for negative timeouts')
 
-            # adapt sleep time to not exceed the remaining time
-            timeout = min(timeout, timeout_remining)
+        my_timeout = None if self.is_infinite() else self.get_remaining()
 
-        time.sleep(timeout)
+        # waiting an infinite time for an infinite timeout is not supported
+        if (my_timeout is None) and (timeout is None):
+            raise Exception('can''t sleep() for an infinite time')
+
+        # if one of the timeouts was infinite, then use the other timeout,
+        # otherwise use the smallest one to ensure we never block longer than
+        # the remaining time of our timeout.
+        timeout = my_timeout if timeout is None else \
+                  timeout if my_timeout is None else \
+                  min(my_timeout, timeout)
+
+        if (0 != timeout):
+            time.sleep(timeout)
 
 
 #===============================================================================
