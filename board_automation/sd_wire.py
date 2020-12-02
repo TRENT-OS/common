@@ -351,7 +351,9 @@ class SD_Wire:
                 return mp
             if ((timeout_sec == 0) or (time.time() > time_end)):
                 return None
-
+            # poll card state every 200 ms. Reducing the value does not bring
+            # much benefit, as is it usually take around 200ms after switching
+            # until the card is mounted
             time.sleep(0.2)
 
 
@@ -401,11 +403,11 @@ class SD_Wire:
 
         self.fsck()
 
-        # try automounter first, mount manually if it fails
+        # try the automounter first, it will block until either (auto-)mounting
+        # was successful or there was a failure and we need to do the mounting
+        # manually. That's why wait_card_mounted() is called with a zero
+        # timeout then, it's supposed to return immediately.
         self.automounter()
-
-        # check if auto-mounter could mount the card, there is no timeout here
-        # because the automouter is blocking
         mp = self.wait_card_mounted(timeout_sec = 0)
         if not mp:
             if not self.mountpoint:

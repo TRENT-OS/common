@@ -276,6 +276,8 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
+    # sleep either for the given time if larger than the remaining time in the
+    # timeout. Otherwise sleep for the remaining time in the timeout only.
     def sleep(self, timeout):
         assert( timeout > 0 )
 
@@ -375,7 +377,8 @@ class Log_File(object):
                             # see a lot of empty lines in the logs
                             break
 
-                        # could not read a complete line, check termination request
+                        # could not read a complete line, check termination
+                        # request
                         if checker_func and not checker_func():
                             is_abort = True
                             break
