@@ -2,7 +2,6 @@
 
 import os
 import shutil
-import time
 
 from . import process_tools
 from . import tools
@@ -295,32 +294,29 @@ class SD_Wire:
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def wait_card_present(self, timeout_sec = 3):
 
-        timeout_sec = max(timeout_sec, 0)
-        time_end = time.time() + timeout_sec
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         while True:
-            if self.is_card_present():
-                return True
-            if ((timeout_sec == 0) or (time.time() > time_end)):
-                return False
+            if self.is_card_present(): return True
+            if timeout.has_expired(): return False
+            timeout.sleep(0.2)
 
-            time.sleep(0.2)
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def wait_card_absent(self, timeout_sec = 3):
 
-        timeout_sec = max(timeout_sec, 0)
-        time_end = time.time() + timeout_sec
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         while True:
-            if not self.is_card_present():
-                return True
-            if ((timeout_sec == 0) or (time.time() > time_end)):
-                return False
-
-            time.sleep(0.2)
+            if not self.is_card_present(): return True
+            if timeout.has_expired(): return False
+            timeout.sleep(0.2)
 
 
     #---------------------------------------------------------------------------
@@ -340,22 +336,21 @@ class SD_Wire:
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def wait_card_mounted(self, timeout_sec = 3):
 
-        timeout_sec = max(timeout_sec, 0)
-        time_end = time.time() + timeout_sec
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         while True:
             mp = self.is_card_mounted()
-            if mp:
-                return mp
-            if ((timeout_sec == 0) or (time.time() > time_end)):
-                return None
-            # poll card state every 200 ms. Reducing the value does not bring
-            # much benefit, as is it usually take around 200ms after switching
-            # until the card is mounted
-            time.sleep(0.2)
-
+            if mp: return mp
+            if timeout.has_expired(): return None
+            # poll card state every 200 ms (or less, if not enough time is
+            # remaining in the timeout object we got). Reducing the value does
+            # not bring much benefit, as is it usually take around 200ms after
+            # switching until the card is mounted.
+            timeout.sleep(0.2)
 
     #---------------------------------------------------------------------------
     def unmount(self):
@@ -385,18 +380,20 @@ class SD_Wire:
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def mount(self, timeout_sec = 5):
 
-        timeout = Timeout_Checker(timeout_sec)
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         euid = os.geteuid()
         if 0 != euid:
             raise Exception('need root access rights (uid={}, euid={})'.format(os.getuid(),euid))
 
-        if not self.wait_card_present(timeout_sec = timeout.get_remaining()):
+        if not self.wait_card_present(timeout):
             raise Exception('SD card partition not present at {}'.format(self.get_dev_partition()))
 
-        mp = self.wait_card_mounted(timeout_sec = timeout.get_remaining())
+        mp = self.wait_card_mounted(timeout)
         if mp:
             print('SD card mounted at {}, unmounting for fsck'.format(mp))
             self.unmount()
@@ -444,9 +441,11 @@ class SD_Wire:
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def switch_to_device_wait_absent(self, timeout_sec = 5):
 
-        timeout = Timeout_Checker(timeout_sec)
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         ret = self.switch_to_device()
         if (ret != 0):
@@ -454,24 +453,28 @@ class SD_Wire:
 
         # wait for card becoming absent if there is a timeout
         print('wait until SD card is absent')
-        if not self.wait_card_absent(timeout_sec = timeout.get_remaining()):
+        if not self.wait_card_absent(timeout):
             raise Exception('SD card partition still present at {}'.format(self.get_dev_partition()))
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def unmount_and_switch_to_device(self, timeout_sec = 5):
 
-        timeout = Timeout_Checker(timeout_sec)
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         print('unmount SD card and switch to device')
         self.unmount()
-        self.switch_to_device_wait_absent(timeout_sec = timeout.get_remaining())
+        self.switch_to_device_wait_absent(timeout)
 
 
     #---------------------------------------------------------------------------
+    # timeout can be an integer or a Timeout_Checker object
     def switch_to_host_and_mount(self, timeout_sec = 5):
 
-        timeout = Timeout_Checker(timeout_sec)
+        if not isinstance(timeout_sec, Timeout_Checker):
+            timeout = Timeout_Checker(timeout_sec)
 
         print('switch SD card to host')
         # the card will be mounted automatically if auto-mounting is enabled
@@ -480,7 +483,7 @@ class SD_Wire:
             raise Exception('switch_to_host() failed, code {}'.format(ret))
 
         print('mount SD card')
-        return self.mount(timeout_sec = timeout.get_remaining())
+        return self.mount(timeout)
 
 
     #---------------------------------------------------------------------------
