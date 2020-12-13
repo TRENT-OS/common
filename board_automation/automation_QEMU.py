@@ -300,8 +300,6 @@ class QemuProxyRunner(board_automation.System_Runner):
     def get_qemu_sd_card_params(self):
         sd_card_params = []
 
-        self.print(self.sd_card_size)
-
         if (self.sd_card_size and self.sd_card_size > 0):
             sd_card_image_name = self.get_log_file_fqn('sdcard1.img')
 
