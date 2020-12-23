@@ -1,5 +1,17 @@
 import pytest, re, time, logs
 
+
+#-------------------------------------------------------------------------------
+def fail_on_assert(f_out):
+    """
+    If there is (so far) an assert in the log then fail the test
+    """
+
+    failed_fn = logs.find_assert(f_out)
+    if failed_fn:
+        pytest.fail("Aborted because {} already failed".format(failed_fn))
+
+
 #-------------------------------------------------------------------------------
 def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True):
     """
