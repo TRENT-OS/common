@@ -13,7 +13,7 @@ def fail_on_assert(f_out):
 
 
 #-------------------------------------------------------------------------------
-def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True):
+def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True, occurrences=1):
     """
     The strategy to check the test results for cases where there is only a
     single test thread (single_thread=True) is as follows:
@@ -32,35 +32,46 @@ def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True):
     for one test may not block other tests from completing. Therefore we skip
     step (1.) and always wait for the correct test result to appear (or its
     corresponding assertion).
+    For any reason the same test may have to run for more than once, either
+    in the same thread or in different threads. In this case one can specify the
+    amount of occurrences, by default it's 1.
     """
 
     __tracebackhide__ = True
 
     f_out = test_run[1]
-    failed_fn = logs.find_assert(f_out) if single_thread else None
+    iterations = occurrences
 
-    # there is no point in using a timeout if we already know of a failure
-    (test_ok, test_assert) = logs.check_result_or_assert(
-                                f_out,
-                                test_fn,
-                                test_args,
-                                0 if failed_fn else timeout)
-    if test_ok:
-        return True
+    while iterations > 0:
+        iterations = iterations - 1
 
-    if test_assert:
-        pytest.fail(test_assert)
+        failed_fn = logs.find_assert(f_out) if single_thread else None
+
+        # there is no point in using a timeout if we already know of a failure
+        (test_ok, test_assert) = logs.check_result_or_assert(
+                                    f_out,
+                                    test_fn,
+                                    test_args,
+                                    0 if failed_fn else timeout)
+        if test_ok:
+            if iterations > 0:
+                continue
+            else:
+                return True
+
+        if test_assert:
+            pytest.fail(test_assert)
+            return False
+
+        if failed_fn:
+            pytest.fail("Aborted because {} already failed".format(failed_fn))
+            return False
+
+        # check the whole log file again for an assert
+        assert_msg = logs.find_assert(f_out)
+        if assert_msg:
+            pytest.fail("Timed out because {} failed".format(assert_msg))
+            return False
+
+        pytest.fail("Timed out but no assertion was found")
         return False
-
-    if failed_fn:
-        pytest.fail("Aborted because {} already failed".format(failed_fn))
-        return False
-
-    # check the whole log file again for an assert
-    assert_msg = logs.find_assert(f_out)
-    if assert_msg:
-        pytest.fail("Timed out because {} failed".format(assert_msg))
-        return False
-
-    pytest.fail("Timed out but no assertion was found")
-    return False
