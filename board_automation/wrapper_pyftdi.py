@@ -41,11 +41,9 @@ def get_pyftdi_gpio(url):
 
 
     ftdi.Ftdi.show_devices()
+
     print('opening {}'.format(url))
-
-
     gpio_contoller = gpio.GpioAsyncController()
-
     gpio_contoller.configure(url, direction=0xFF)
 
     return gpio_contoller
