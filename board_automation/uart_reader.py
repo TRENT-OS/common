@@ -82,7 +82,7 @@ class TTY_USB():
         print('USB/serial adapter list')
         dev_list = self_or_cls.get_device_list()
         for dev in dev_list:
-            print('  {} is {}:{} {} at {}, driver {})'.format(
+            print('  {} is {}:{} {} at {}, driver {}'.format(
                   dev.device,
                   dev.vid,
                   dev.pid,
