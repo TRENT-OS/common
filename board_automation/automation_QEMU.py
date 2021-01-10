@@ -9,6 +9,7 @@ import os
 import subprocess
 
 from . import tools
+from .tools import Timeout_Checker
 from . import process_tools
 from . import board_automation
 
@@ -365,7 +366,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             # logged.
             self.system_log_file.start_monitor(
                 printer = self.run_context.printer,
-                timeout = tools.Timeout_Checker.infinite(),
+                timeout = Timeout_Checker.infinite(),
                 checker_func = lambda: self.is_qemu_running()
             )
 
@@ -383,7 +384,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.bridge.connect_to_server(
             '127.0.0.1',
             self.qemu_uart_network_port,
-            tools.Timeout_Checker(5))
+            Timeout_Checker(5))
 
 
     #---------------------------------------------------------------------------
