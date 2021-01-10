@@ -10,6 +10,42 @@ tools.add_subdir_to_sys_path(__file__, 'pyusb')
 tools.add_subdir_to_sys_path(__file__, 'pyftdi')
 from pyftdi import gpio, ftdi
 
+#===============================================================================
+#===============================================================================
+
+class FTDI_CBUS_GPIO:
+
+    #---------------------------------------------------------------------------
+    def __init__(self, url):
+
+        self.ftdi = ftdi.Ftdi()
+
+        self.ftdi.open_from_url(url)
+
+        if not self.ftdi.has_cbus:
+            raise Exception('CBUS not available')
+
+        # 4 CBUS pins, all are output
+        self.configure(mask=0x0F, direction=0x0F)
+
+
+    #---------------------------------------------------------------------------
+    def configure(self, mask, direction):
+        self.ftdi.set_cbus_direction(mask, direction)
+
+
+    #---------------------------------------------------------------------------
+    def write(self, mask):
+        self.ftdi.set_cbus_gpio(mask)
+
+
+    #---------------------------------------------------------------------------
+    def read(self):
+        return self.ftdi.get_cbus_gpio(mask)
+
+
+#===============================================================================
+#===============================================================================
 
 #-------------------------------------------------------------------------------
 # FTDI VID 0x0403
@@ -20,6 +56,7 @@ from pyftdi import gpio, ftdi
 #   FT2232C/D/L, FT2232HL/Q                         | 0x6010
 #   FT4232HL/Q                                      | 0x6011
 #   FT232HL/Q                                       | 0x6014
+#   FT200XD                                         | 0x6015
 #
 def list_devices(vid = 0x0403):
     def get_id_from_file(dn, id_file):
@@ -48,3 +85,9 @@ def get_pyftdi_gpio(url):
     gpio_contoller.configure(url, direction=0xFF)
 
     return gpio_contoller
+
+
+#-------------------------------------------------------------------------------
+def get_pyftdi_cbus_gpio(url):
+
+    return FTDI_CBUS_GPIO(url)

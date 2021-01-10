@@ -32,14 +32,10 @@ class Board_Setup_RasPi():
                             )
 
 
-        sd_mux_ctrl = pathlib.Path(__file__).parent.absolute().joinpath(
-                        'bin', 'sd-mux-ctrl')
         self.sd_wire = sd_wire.SD_Wire(
                     serial     = 'sdw-7',
                     usb_path   = '1-4.2.1.2.2.2',
-                    mountpoint = '/media',
-                    ctrl_app   = sd_mux_ctrl,
-                    env        = {'LD_LIBRARY_PATH': os.path.dirname(sd_mux_ctrl)} )
+                    mountpoint = '/media')
 
 
         self.uart0 = uart_reader.TTY_USB.find_device(

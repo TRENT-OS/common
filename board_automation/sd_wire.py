@@ -5,8 +5,10 @@ import shutil
 
 from . import process_tools
 from . import tools
+from . import wrapper_pyftdi
 from .tools import Timeout_Checker
 
+from pyftdi import ftdi
 
 #===============================================================================
 #===============================================================================
@@ -76,6 +78,51 @@ class SD_MUX_CTRL_Binary_Wrapper_Device:
 #===============================================================================
 #===============================================================================
 
+class SD_WIRE_Controller:
+    #---------------------------------------------------------------------------
+    def __init__(self, serial):
+        self.serial = serial
+
+        # sd-wire uses a FT200XD, the SD card switch is controlled via CBUS0.
+        # There is an EEPROM that makes the chip use a dedicated VID/PID.
+        VID_SAMSUNG = 0x04e8 # FT200XD default is 0x0403h (FTDI)
+        PID_SD_WIRE = 0x6001 # FT200XD default is 0x6015. FTDI uses PID 0x6001
+                             #  for FT232 and FT245
+
+        # register sd-wire device with pyftdi core, so we can use it
+        ftdi.Ftdi.add_custom_vendor(VID_SAMSUNG, 'samsung')
+        ftdi.Ftdi.add_custom_product(VID_SAMSUNG, PID_SD_WIRE, 'sd_wire')
+
+        url = 'ftdi://0x{:04x}:0x{:04x}:{}/1'.format(
+                    VID_SAMSUNG,
+                    PID_SD_WIRE,
+                    self.serial)
+        print('open by URL: {}'.format(url))
+        self.cbus_gpio = wrapper_pyftdi.get_pyftdi_cbus_gpio(url)
+
+
+    #---------------------------------------------------------------------------
+    @tools.class_or_instance_method
+    def list_devices(self_or_cls):
+        print('SD Wire devices (via pyftdi)')
+        ftdi.Ftdi.show_devices('ftdi:///?')
+
+
+    #---------------------------------------------------------------------------
+    def switch_to_device(self):
+        self.cbus_gpio.write(0)  # set CBUS0 = 0
+        return 0
+
+
+    #---------------------------------------------------------------------------
+    def switch_to_host(self):
+        self.cbus_gpio.write(1)  # set CBUS0 = 1
+        return 0
+
+
+#===============================================================================
+#===============================================================================
+
 class SD_Wire_Device:
     """
     wraps an SD-Wire device
@@ -111,15 +158,12 @@ class SD_Wire:
         self.partition = partition
         self.mountpoint = mountpoint
 
-        sw_wire_app = SD_MUX_CTRL_Binary_Wrapper(ctrl_app, env)
-
-        self.bin_ctrl = SD_MUX_CTRL_Binary_Wrapper_Device(
-                            self.serial,
-                            sw_wire_app
-                        )
         try:
-            if serial:
+            if self.serial:
                 print('using SW Wire: {}'.format(self.serial))
+                self.sd_wire_ctrl = SD_WIRE_Controller(self.serial)
+
+                # sanity check
                 self.dev = self.find_by_serial(self.serial)
                 if self.dev is None:
                     raise Exception('no sd-wire device found with s/n: {}'.format(self.serial))
@@ -141,7 +185,11 @@ class SD_Wire:
             # print what the tools find and what we find. Ideally all outputs
             # show the same devices
             self.list_devices()
-            sw_wire_app.list_devices()
+            SD_WIRE_Controller.list_devices()
+            if ctrl_app:
+                sw_wire_app = SD_MUX_CTRL_Binary_Wrapper(ctrl_app, env)
+                sw_wire_app.list_devices()
+
             raise e
 
         # print('device: {}'.format(self.get_dev_partition()))
@@ -272,12 +320,12 @@ class SD_Wire:
 
     #---------------------------------------------------------------------------
     def switch_to_device(self):
-        return self.bin_ctrl.switch_to_device()
+        return self.sd_wire_ctrl.switch_to_device()
 
 
     #---------------------------------------------------------------------------
     def switch_to_host(self):
-        return self.bin_ctrl.switch_to_host()
+        return self.sd_wire_ctrl.switch_to_host()
 
 
     #---------------------------------------------------------------------------

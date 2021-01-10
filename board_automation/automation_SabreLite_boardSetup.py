@@ -33,14 +33,10 @@ class Board_Setup_SabreLite():
                             )
 
 
-        sd_mux_ctrl = pathlib.Path(__file__).parent.absolute().joinpath(
-                        'bin', 'sd-mux-ctrl')
         self.sd_wire = sd_wire.SD_Wire(
                     serial     = '202005170015',
                     usb_path   = '1-4.2.1.4.2.2',
-                    mountpoint = '/media',
-                    ctrl_app   = sd_mux_ctrl,
-                    env        = {'LD_LIBRARY_PATH': os.path.dirname(sd_mux_ctrl)} )
+                    mountpoint = '/media')
 
 
         self.uart0 = uart_reader.TTY_USB.find_device(
