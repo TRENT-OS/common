@@ -297,8 +297,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def wait_card_present(self, timeout_sec = 3):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         while True:
             if self.is_card_present(): return True
@@ -310,8 +309,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def wait_card_absent(self, timeout_sec = 3):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         while True:
             if not self.is_card_present(): return True
@@ -339,8 +337,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def wait_card_mounted(self, timeout_sec = 3):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         while True:
             mp = self.is_card_mounted()
@@ -383,8 +380,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def mount(self, timeout_sec = 5):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         euid = os.geteuid()
         if 0 != euid:
@@ -444,8 +440,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def switch_to_device_wait_absent(self, timeout_sec = 5):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         ret = self.switch_to_device()
         if (ret != 0):
@@ -461,8 +456,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def unmount_and_switch_to_device(self, timeout_sec = 5):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         print('unmount SD card and switch to device')
         self.unmount()
@@ -473,8 +467,7 @@ class SD_Wire:
     # timeout can be an integer or a Timeout_Checker object
     def switch_to_host_and_mount(self, timeout_sec = 5):
 
-        if not isinstance(timeout_sec, Timeout_Checker):
-            timeout = Timeout_Checker(timeout_sec)
+        timeout = Timeout_Checker(timeout_sec)
 
         print('switch SD card to host')
         # the card will be mounted automatically if auto-mounting is enabled

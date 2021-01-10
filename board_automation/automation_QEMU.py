@@ -141,7 +141,9 @@ class TcpBridge():
 
     #---------------------------------------------------------------------------
     # connect the bridge to a server, use infinite timeout by default
-    def connect_to_server(self, addr, port, timeout = None):
+    def connect_to_server(self, addr, port, timeout_sec = None):
+
+        timeout = Timeout_Checker(timeout_sec)
 
         peer = (addr, port)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
