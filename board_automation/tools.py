@@ -235,14 +235,8 @@ class Timeout_Checker(object):
     # timeout, ie. "do not block".
     def __init__(self, timeout_sec):
 
-        self.time_end = None
-
-        if (timeout_sec is None) or (timeout_sec < 0):
-            timeout_sec = -1
-        else:
-            self.time_end = time.time() + timeout_sec
-
-        self.timeout_sec = timeout_sec
+        self.time_end = None if (timeout_sec is None) or (timeout_sec < 0) \
+                        else time.time() + timeout_sec
 
 
     #---------------------------------------------------------------------------
