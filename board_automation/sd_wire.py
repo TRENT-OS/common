@@ -48,9 +48,6 @@ class SD_MUX_CTRL_Binary_Wrapper_Device:
         self.serial = serial
         self.binary_wrapper = binary_wrapper
 
-    #---------------------------------------------------------------------------
-    def list_devices(self):
-        self.binary_wrapper.list_devices()
 
     #---------------------------------------------------------------------------
     def cmd(self, params):
@@ -59,11 +56,6 @@ class SD_MUX_CTRL_Binary_Wrapper_Device:
             params.extend(['-e', self.serial])
 
         return self.binary_wrapper.cmd(params)
-
-
-    #---------------------------------------------------------------------------
-    def list_devices(self):
-        return self.binary_wrapper.list_devices()
 
 
     #---------------------------------------------------------------------------
@@ -119,14 +111,16 @@ class SD_Wire:
         self.partition = partition
         self.mountpoint = mountpoint
 
+        sw_wire_app = SD_MUX_CTRL_Binary_Wrapper(ctrl_app, env)
+
         self.bin_ctrl = SD_MUX_CTRL_Binary_Wrapper_Device(
                             self.serial,
-                            SD_MUX_CTRL_Binary_Wrapper(ctrl_app, env)
+                            sw_wire_app
                         )
 
         # print what the tools find and what we find. Ideally both outputs
         # show the same devices
-        self.bin_ctrl.list_devices()
+        sw_wire_app.list_devices()
         self.list_devices()
 
         if serial:
