@@ -139,7 +139,7 @@ class TcpBridge():
 
 
     #---------------------------------------------------------------------------
-    # connect the bridge to a server
+    # connect the bridge to a server, use infinite timeout by default
     def connect_to_server(self, addr, port, timeout = None):
 
         peer = (addr, port)
@@ -371,15 +371,15 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         # QEMU is starting up now. If some output is redirected to files, these
         # files may not exist until there is some actual output written. There
-        # is not much gain if we sleep here hoping the file pop into existence.
-        # The users of these files must care of them no existing and then
-        # popping into existence eventually
-        # Now start a TCP server to connect to QEMU's serial port. It depends
-        # on the system load how long the QEMU process takes to start and also
-        # when QEMU's internal startup is done, so the QEMU is listening on the
-        # port. Tests showed that without system load, timeouts are rarely
-        # needed, but once there is a decent system load, even 500 ms may not
-        # be enough. With 5 seconds we should be safe.
+        # is not much gain if we sleep now hoping the files pop into existence.
+        # The users of these files must handle the fact that they don't exist
+        # at first and pop into existence eventually
+        # Next step is starting a TCP server to connect to QEMU's serial port.
+        # It depends on the system load how long the QEMU process itself takes
+        # to start and when QEMU's internal startup is done, so it is listening
+        # on the port. Tests showed that without system load, timeouts are
+        # rarely needed, but once there is a decent system load, even 500 ms
+        # may not be enough. With 5 seconds we should be safe.
         self.bridge.connect_to_server(
             '127.0.0.1',
             self.qemu_uart_network_port,

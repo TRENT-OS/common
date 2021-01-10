@@ -231,8 +231,8 @@ class PrintSerializer():
 class Timeout_Checker(object):
 
     #---------------------------------------------------------------------------
-    # any value less than 0 or None means infinite, the value 0 can be used to
-    # indicate "do not block".
+    # any value less than 0 or None means infinite, the value 0 indicates a zero
+    # timeout, ie. "do not block".
     def __init__(self, timeout_sec):
 
         self.time_end = None

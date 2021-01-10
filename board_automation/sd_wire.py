@@ -86,7 +86,7 @@ class SD_MUX_CTRL_Binary_Wrapper_Device:
 
 class SD_Wire_Device:
     """
-    wraps an SD Write device
+    wraps an SD-Wire device
     """
     #---------------------------------------------------------------------------
     def __init__(self, usb_path, vid, pid, serial, usb_path_sd, dev_sd):
