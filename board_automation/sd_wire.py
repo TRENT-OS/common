@@ -117,29 +117,32 @@ class SD_Wire:
                             self.serial,
                             sw_wire_app
                         )
+        try:
+            if serial:
+                print('using SW Wire: {}'.format(self.serial))
+                self.dev = self.find_by_serial(self.serial)
+                if self.dev is None:
+                    raise Exception('no sd-wire device found with s/n: {}'.format(self.serial))
+                if usb_path and (usb_path != self.dev.usb_path):
+                    raise Exception('USB path different, expected {}, got {}'.format(usb_path, self.dev.usb_path))
 
-        # print what the tools find and what we find. Ideally both outputs
-        # show the same devices
-        sw_wire_app.list_devices()
-        self.list_devices()
+            elif usb_path:
+                raise Exception('implement me')
+                #self.dev = self.find_by_ ...
+                # look up USB path and check if there's a SD wire device
+                if serial and (serial != self.dev.serial):
+                    raise Exception('serial number different, expected {}, got {}'.format(serial, self.dev.serial))
 
-        if serial:
-            print('using SW Wire: {}'.format(self.serial))
-            self.dev = self.find_by_serial(self.serial)
-            if self.dev is None:
-                raise Exception('no sd-wire device found with s/n: {}'.format(self.serial))
-            if usb_path and (usb_path != self.dev.usb_path):
-                raise Exception('USB path different, expected {}, got {}'.format(usb_path, self.dev.usb_path))
+            else:
+                raise Exception('must specify serial and/or USB path')
 
-        elif usb_path:
-            raise Exception('implement me')
-            #self.dev = self.find_by_ ...
-            # look up USB path and check if there's a SD wire device
-            if serial and (serial != self.dev.serial):
-                raise Exception('serial number different, expected {}, got {}'.format(serial, self.dev.serial))
-
-        else:
-            raise Exception('must specify serial and/or USB path')
+        except Exception as e:
+            print('EXCEPTION:', e)
+            # print what the tools find and what we find. Ideally all outputs
+            # show the same devices
+            self.list_devices()
+            sw_wire_app.list_devices()
+            raise e
 
         # print('device: {}'.format(self.get_dev_partition()))
         #
