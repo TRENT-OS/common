@@ -352,6 +352,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # order is preserved when adding elements to an array.
                 self.serial_ports = []
 
+                # There can be multiple NICs. Python guarantees the order is
+                # preserved when adding elements to an array.
+                self.nics = []
+
                 self.params = [] # additional parameters
 
             #-------------------------------------------------------------------
@@ -430,6 +434,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # connect all serial ports
                 for p in self.serial_ports:
                     cmd_arr += ['-serial', p if p else 'null']
+
+                # connect all NICs to existing TAPx devices
+                for p in self.nics:
+                    cmd_arr += ['-nic', 'tap,ifname={},script=no'.format(p)]
 
                 if self.sd_card_image:
                     if (self.machine in ['spike', 'sifive_u']):
@@ -637,6 +645,9 @@ class QemuProxyRunner(board_automation.System_Runner):
         if self.sd_card_size and (self.sd_card_size > 0):
             qemu.sd_card_image = self.get_log_file_fqn('sdcard1.img')
             qemu.sd_card_size = self.sd_card_size
+
+        if self.run_context.platform == 'sabre':
+            qemu.nics += ['tap0']
 
         # Running test on the zynqmp requires 2 QEMU instances and passing
         # additional parameters.
