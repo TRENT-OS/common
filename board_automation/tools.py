@@ -253,8 +253,8 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
-    # this returns a value greater or equal zero, negative values indicate that
-    # the timeout is infinite
+    # Returns a value greater zero if time left, zero if the timeout has been
+    # reached or a negative value if the timeout is infinite.
     def get_remaining(self):
 
         if self.is_infinite():
@@ -272,8 +272,9 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
-    # sleep either for the given time if larger than the remaining time in the
-    # timeout. Otherwise sleep for the remaining time in the timeout only.
+    # Sleep either for the given time, if this is less than the remaining time
+    # in our timeout. Otherwise sleep for the remaining time in our timeout
+    # only.
     def sleep(self, timeout):
 
         if (timeout is None):
