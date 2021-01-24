@@ -272,35 +272,53 @@ class Timeout_Checker(object):
 
 
     #---------------------------------------------------------------------------
+    # Returns a Timeout_Checker instance covering up to the given number of
+    # seconds, where timeout_sec can be a value or another Timeout_Checker
+    # instance. Any value passed for timeout_sec that is less than 0 or None
+    # means infinite. The timeout cannot exceed the amount of time left in
+    # parent's timeout, but it can be infinite if the parent's timeout is
+    # infinite.
+    def sub_timeout(self, timeout_sec):
+
+        sub_timeout = Timeout_Checker(timeout_sec)
+
+        # If we are an infinite timeout, we can can grant anything, otherwise
+        # we must cut the timeout at out own timeout and basically return a
+        # clone of us.
+        if not self.is_infinite() \
+           and (sub_timeout.is_infinite() \
+                or (sub_timeout.get_remaining() > self.get_remaining())):
+            return Timeout_Checker(self)
+
+        return sub_timeout
+
+
+    #---------------------------------------------------------------------------
     # Sleep either for the given time, if this is less than the remaining time
     # in our timeout. Otherwise sleep for the remaining time in our timeout
-    # only.
+    # only. The parameter timeout can hold a value of another Timeout_Checker
+    # instance.
     def sleep(self, timeout):
 
+        # We don't handle None as 0, because if we see None here this is likely
+        # a bug in the caller's code.
         if (timeout is None):
-            # we don't handle None as 0, because if we see None here this is
-            # likely a bug in the caller's code.
             raise Exception('can''t sleep() for timeout "None"')
 
-        elif isinstance(timeout, Timeout_Checker):
-            timeout = None if timeout.is_infinite() else self.get_remaining()
-
-        elif (timeout < 0):
+        # Passing negative values is likely a bug in the caller's code.
+        if not isinstance(timeout, Timeout_Checker) and (timeout < 0):
             raise Exception('can''t sleep() for negative timeouts')
 
-        my_timeout = None if self.is_infinite() else self.get_remaining()
+        sub_timeout = self.sub_timeout(timeout)
 
-        # waiting an infinite time for an infinite timeout is not supported
-        if (my_timeout is None) and (timeout is None):
+        # Waiting an infinite time when we have an infinite timeout is not
+        # supported, because this is likely a bug in the caller's code.
+        if sub_timeout.is_infinite():
+            assert(self.is_infinite())
             raise Exception('can''t sleep() for an infinite time')
 
-        # if one of the timeouts was infinite, then use the other timeout,
-        # otherwise use the smallest one to ensure we never block longer than
-        # the remaining time of our timeout.
-        timeout = my_timeout if timeout is None else \
-                  timeout if my_timeout is None else \
-                  min(my_timeout, timeout)
-
+        # get the timeout, sleep only if it has not already expired
+        timeout = sub_timeout.get_remaining()
         if (0 != timeout):
             time.sleep(timeout)
 
