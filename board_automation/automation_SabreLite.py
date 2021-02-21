@@ -4,30 +4,6 @@ import time
 
 from . import tools
 from . import board_automation
-from . import relay_control
-
-
-#===============================================================================
-#===============================================================================
-
-class Relay_Config(relay_control.Relay_Config):
-
-    #---------------------------------------------------------------------------
-    def __init__(self, POWER, RESET, SW1_1, SW1_2):
-
-        super().__init__()
-
-        self.POWER = POWER
-        self.add_relay_mgr(POWER)
-
-        self.RESET = RESET
-        self.add_relay_mgr(RESET)
-
-        self.SW1_1 = SW1_1
-        self.add_relay_mgr(SW1_1)
-
-        self.SW1_2 = SW1_2
-        self.add_relay_mgr(SW1_2)
 
 
 #===============================================================================
@@ -42,6 +18,11 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def __init__(self, relay_config, printer = None):
+
+        req_relays = ['POWER', 'RESET', 'SW1_1', 'SW1_2']
+        if not relay_config.check_relays_exist(req_relays):
+            raise Exception(
+                    'relay configuration invalid, need {}'.format(req_relays))
 
         self.relay_config = relay_config;
         self.printer      = printer

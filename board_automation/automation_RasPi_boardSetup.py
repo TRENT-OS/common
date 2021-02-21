@@ -9,8 +9,6 @@ from . import sd_wire
 from . import uart_reader
 from . import wrapper_pyftdi
 
-from . import automation_RasPi
-
 
 #===============================================================================
 #===============================================================================
@@ -25,11 +23,11 @@ class Board_Setup():
         self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
         relay_board = relay_control.Relay_Board(self.gpio)
 
-        self.relay_config = automation_RasPi.Relay_Config(
-                                POWER  = relay_board.get_relay(0),
-                                notRUN = relay_board.get_relay(1),
-                                notPEN = relay_control.Relay_Dummy()
-                            )
+        self.relay_config = relay_control.Relay_Config({
+                                'POWER':  relay_board.get_relay(0),
+                                'notRUN': relay_board.get_relay(1),
+                                'notPEN': relay_control.Relay_Dummy()
+                             })
 
 
         self.sd_wire = sd_wire.SD_Wire(

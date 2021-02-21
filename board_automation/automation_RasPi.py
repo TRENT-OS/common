@@ -6,27 +6,6 @@ import pathlib
 
 from . import tools
 from . import board_automation
-from . import relay_control
-
-
-#===============================================================================
-#===============================================================================
-
-class Relay_Config(relay_control.Relay_Config):
-
-    #---------------------------------------------------------------------------
-    def __init__(self, POWER, notRUN, notPEN):
-
-        super().__init__()
-
-        self.POWER = POWER
-        self.add_relay_mgr(POWER)
-
-        self.notRUN = notRUN
-        self.add_relay_mgr(notRUN)
-
-        self.notPEN = notPEN
-        self.add_relay_mgr(notPEN)
 
 
 #===============================================================================
@@ -36,6 +15,11 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def __init__(self, relay_config, printer = None):
+
+        req_relays = ['POWER', 'notRUN', 'notPEN']
+        if not relay_config.check_relays_exist(req_relays):
+            raise Exception(
+                    'relay configuration invalid, need {}'.format(req_relays))
 
         self.relay_config = relay_config;
         self.printer      = printer

@@ -153,17 +153,30 @@ class Relay_Config(object):
     """
 
     #---------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, relay_dict = {}):
+        self.relay_list = []
         self.relay_mgr_list = []
+        self.add_relays(relay_dict)
 
 
     #---------------------------------------------------------------------------
-    def add_relay_mgr(self, relay):
-        if relay is not None:
-            manager = relay.get_manager()
-            if manager is not None and manager not in self.relay_mgr_list:
+    def add_relays(self, relay_dict = {}):
+        for name, handler in relay_dict.items():
+            setattr(self, name, handler)
+            self.relay_list.append(name)
+            # relays may have a manager if they are part of a group of
+            # multiple relays
+            manager = handler.get_manager()
+            if (manager is not None) and (manager not in self.relay_mgr_list):
                 self.relay_mgr_list.append(manager)
 
+    #---------------------------------------------------------------------------
+    def check_relays_exist(self, str_list):
+        for relay_name in str_list:
+            if not relay_name in self.relay_list:
+                return False
+
+        return True
 
     #---------------------------------------------------------------------------
     def apply_state(self):
