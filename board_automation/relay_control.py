@@ -1,12 +1,99 @@
 #!/usr/bin/python3
 
+import abc  # abstract base class
+import inspect
 import time
 
 
 #===============================================================================
 #===============================================================================
 
-class Relay(object):
+class Relay_Base(abc.ABC):
+    """
+    Abstract relay base class.
+    """
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def get_manager(self):
+        return None
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def prepare_state_on(self):
+        pass
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def prepare_state_off(self):
+        pass
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def apply_state(self):
+        pass
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def set_on(self):
+        pass
+
+    #---------------------------------------------------------------------------
+    @abc.abstractmethod
+    def set_off(self):
+        pass
+
+
+#===============================================================================
+#===============================================================================
+
+class Relay_Dummy(Relay_Base):
+    """
+    A dummy relay that does nothing. Useful as placeholder until there is a
+    real relay
+    """
+    pass
+
+    #---------------------------------------------------------------------------
+    def __init__(self):
+        pass
+
+
+    #---------------------------------------------------------------------------
+    def get_manager(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+        return None
+
+
+    #---------------------------------------------------------------------------
+    def prepare_state_on(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+
+
+    #---------------------------------------------------------------------------
+    def prepare_state_off(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+
+
+    #---------------------------------------------------------------------------
+    def apply_state(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+
+
+    #---------------------------------------------------------------------------
+    def set_on(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+
+
+    #---------------------------------------------------------------------------
+    def set_off(self):
+        print('{}() not implemented'.format(inspect.stack()[1][3]))
+
+
+#===============================================================================
+#===============================================================================
+
+class Relay(Relay_Base):
     """
     A relay from a relay board. Usually obtained from the relay board object
     via a get_relay(id) function. A relay can either be switched on and off
@@ -54,50 +141,6 @@ class Relay(object):
     # switch the relay off
     def set_off(self):
         self.relay_mgr.set_off(self.relay_id)
-
-
-#===============================================================================
-#===============================================================================
-    """
-    A dummy relay, the object provides all function but does nothing. This is
-    easier to use than "None".
-    """
-
-class Relay_Dummy(object):
-
-    #---------------------------------------------------------------------------
-    def __init__(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    def get_manager(self):
-        return None
-
-
-    #---------------------------------------------------------------------------
-    def prepare_state_on(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    def prepare_state_off(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    def apply_state(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    def set_on(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    def set_off(self):
-        pass
 
 
 #===============================================================================
