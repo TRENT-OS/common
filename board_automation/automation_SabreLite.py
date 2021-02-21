@@ -53,7 +53,7 @@ class Automation_SabreLite(object):
     #---------------------------------------------------------------------------
     def print(self, msg):
         if self.printer:
-                self.printer.print(msg)
+            self.printer.print(msg)
 
 
     #---------------------------------------------------------------------------
