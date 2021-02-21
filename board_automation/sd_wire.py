@@ -410,7 +410,7 @@ class SD_Wire:
     #---------------------------------------------------------------------------
     def automounter(self):
 
-        print('automounter() disbled, tools not in docker container')
+        print('automounter() disabled, tools not in docker container')
 
         # # https://superuser.com/questions/638225/manually-trigger-automount-in-debian-based-linux
         # #cmd_arr = ['udisks', '--mount', self.get_dev_partition()]

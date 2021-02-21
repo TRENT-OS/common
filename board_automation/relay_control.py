@@ -60,7 +60,7 @@ class Relay(object):
 #===============================================================================
     """
     A dummy relay, the object provides all function but does nothing. This is
-    easier top use than "None".
+    easier to use than "None".
     """
 
 class Relay_Dummy(object):

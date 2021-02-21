@@ -46,7 +46,7 @@ class Automation_SabreLite(object):
         self.relay_config = relay_config;
         self.printer      = printer
 
-        # put all relays in a well define state
+        # put all relays in a well defined state
         self.relay_config.set_all_off()
 
 
