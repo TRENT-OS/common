@@ -32,9 +32,9 @@ def get_test_runner(
                         proxy_config)
 
     if (platform == 'sabre-hw'):
-        return automation_SabreLite.boardRunner_SabreLite(
+        return automation_SabreLite.BoardRunner(
                         run_context,
-                        automation_SabreLite_boardSetup.Board_Setup_SabreLite(
+                        automation_SabreLite_boardSetup.Board_Setup(
                             run_context.printer))
 
     elif (platform == 'zynq7000'):
@@ -43,9 +43,9 @@ def get_test_runner(
                         proxy_config)
 
     elif (platform == 'rpi3'):
-        return automation_RasPi.boardRunner_RasPi(
+        return automation_RasPi.BoardRunner(
                         run_context,
-                        automation_RasPi_boardSetup.Board_Setup_RasPi(
+                        automation_RasPi_boardSetup.Board_Setup(
                             run_context.printer))
 
     else:

@@ -10,7 +10,7 @@ from . import relay_control
 #===============================================================================
 #===============================================================================
 
-class Relay_Config_SabreLite(relay_control.Relay_Config):
+class Relay_Config(relay_control.Relay_Config):
 
     #---------------------------------------------------------------------------
     def __init__(self, POWER, RESET, SW1_1, SW1_2):
@@ -33,7 +33,7 @@ class Relay_Config_SabreLite(relay_control.Relay_Config):
 #===============================================================================
 #===============================================================================
 
-class Automation_SabreLite(object):
+class Automation(object):
 
     # fuse setting boot: SW1-1 off, SW1-2 off
     # USB boot:          SW1-1 off, SW1-2 on
@@ -122,14 +122,14 @@ class Automation_SabreLite(object):
 #===============================================================================
 #===============================================================================
 
-class boardRunner_SabreLite(board_automation.System_Runner):
+class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
     def __init__(self, run_context, board_setup):
 
         super().__init__(run_context, board_setup)
 
-        self.board = Automation_SabreLite(
+        self.board = Automation(
                         board_setup.relay_config,
                         run_context.printer)
 

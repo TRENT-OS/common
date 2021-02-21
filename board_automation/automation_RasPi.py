@@ -12,7 +12,7 @@ from . import relay_control
 #===============================================================================
 #===============================================================================
 
-class Relay_Config_RasPi(relay_control.Relay_Config):
+class Relay_Config(relay_control.Relay_Config):
 
     #---------------------------------------------------------------------------
     def __init__(self, POWER, notRUN, notPEN):
@@ -32,7 +32,7 @@ class Relay_Config_RasPi(relay_control.Relay_Config):
 #===============================================================================
 #===============================================================================
 
-class Automation_RasPi(object):
+class Automation(object):
 
     #---------------------------------------------------------------------------
     def __init__(self, relay_config, printer = None):
@@ -82,14 +82,14 @@ class Automation_RasPi(object):
 #===============================================================================
 #===============================================================================
 
-class boardRunner_RasPi(board_automation.System_Runner):
+class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
     def __init__(self, run_context, board_setup):
 
         super().__init__(run_context, board_setup)
 
-        self.board = Automation_RasPi(
+        self.board = Automation(
                         board_setup.relay_config,
                         run_context.printer)
 

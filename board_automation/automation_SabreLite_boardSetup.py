@@ -15,7 +15,7 @@ from . import automation_SabreLite
 #===============================================================================
 #===============================================================================
 
-class Board_Setup_SabreLite():
+class Board_Setup():
 
     #---------------------------------------------------------------------------
     def __init__(self, printer = None):
@@ -25,7 +25,7 @@ class Board_Setup_SabreLite():
         self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
         relay_board = relay_control.Relay_Board(self.gpio)
 
-        self.relay_config = automation_SabreLite.Relay_Config_SabreLite(
+        self.relay_config = automation_SabreLite.Relay_Config(
                                 POWER = relay_board.get_relay(4),
                                 RESET = relay_board.get_relay(5),
                                 SW1_1 = relay_board.get_relay(6),

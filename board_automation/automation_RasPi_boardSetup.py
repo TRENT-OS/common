@@ -15,7 +15,7 @@ from . import automation_RasPi
 #===============================================================================
 #===============================================================================
 
-class Board_Setup_RasPi():
+class Board_Setup():
 
     #---------------------------------------------------------------------------
     def __init__(self, printer = None):
@@ -25,7 +25,7 @@ class Board_Setup_RasPi():
         self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
         relay_board = relay_control.Relay_Board(self.gpio)
 
-        self.relay_config = automation_RasPi.Relay_Config_RasPi(
+        self.relay_config = automation_RasPi.Relay_Config(
                                 POWER  = relay_board.get_relay(0),
                                 notRUN = relay_board.get_relay(1),
                                 notPEN = relay_control.Relay_Dummy()
