@@ -178,7 +178,12 @@ class UART_Reader():
                 # readline() encountered a timeout
                 continue
 
-            line_str = line.strip().decode('utf-8')
+            # We support raw plain single byte ASCII chars only, because they
+            # can always be decoded as all 256 bit combinations are valid. For
+            # the standard string UTF-8 encoding with multi-byte chars, certain
+            # bit pattern (e.g. from line garbage or transmission errors) would
+            # raise decoding errors because they are are no valid.
+            line_str = line.strip().decode('latin_1')
 
             # remove backspace chars, as we don't want to have the
             # cursor move backwards on the screen. Could also print
