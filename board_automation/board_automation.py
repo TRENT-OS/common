@@ -114,7 +114,7 @@ class System_Runner(object):
 
     #---------------------------------------------------------------------------
     # sub-classes may overwrite this
-    def check_start_success(self):
+    def check_start_success(self, is_native_system = False):
 
         (ret , idx, idx2) = self.system_log_match_multiple_sequences([
 
@@ -130,6 +130,16 @@ class System_Runner(object):
 
             # check if the seL4 kernel booted properly, 5 secs should be enough
             ( [ 'Booting all finished, dropped to user space' ], 5),
+        ])
+
+        if not ret:
+            raise Exception('boot string #{}.{} not found'.format(idx, idx2))
+
+        # There is no CapDL loader in a native system.
+        if is_native_system:
+            return
+
+        (ret , idx, idx2) = self.system_log_match_multiple_sequences([
 
             # the CapDL Loader runs a as root task. It should run immediately,
             # so 2 secs should do.
@@ -142,7 +152,7 @@ class System_Runner(object):
         ])
 
         if not ret:
-            raise Exception('boot string #{}.{} not found'.format(idx, idx2))
+            raise Exception('CapDL Loader string #{}.{} not found'.format(idx, idx2))
 
 
     #---------------------------------------------------------------------------
