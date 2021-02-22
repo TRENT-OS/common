@@ -335,7 +335,16 @@ class SD_Wire:
 
     #---------------------------------------------------------------------------
     def is_card_present(self):
-        return tools.get_disk_id_for_dev( self.get_dev_partition() )
+        # For every SD card reader, the device name (e.g. "/dev/sdb") is fixed
+        # when the device is connected. The disk ID for the device is also
+        # fixed. Card presence can be found out by asking for a partition's
+        # disk ID (e.g. "/dev/sdb1"), this is None if no card is present. A more
+        # generic method is checking "/sys/block/<dev>/size", this is 0 if no
+        # card is present.
+        part = self.get_dev_partition()
+        disk_id = tools.get_disk_id_for_dev( part )
+        #print('is_card_present: {} is {}'.format(part, disk_id))
+        return disk_id is not None
 
 
     #---------------------------------------------------------------------------
