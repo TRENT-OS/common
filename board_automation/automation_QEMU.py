@@ -300,64 +300,195 @@ class QemuProxyRunner(board_automation.System_Runner):
         return self.process_proxy and self.process_proxy.is_running()
 
     #---------------------------------------------------------------------------
-    def get_qemu_sd_card_params(self):
-        sd_card_params = []
-
-        if (self.sd_card_size and self.sd_card_size > 0):
-            sd_card_image_name = self.get_log_file_fqn('sdcard1.img')
-
-            with open(sd_card_image_name, 'wb') as sd_card_image:
-                sd_card_image.truncate(self.sd_card_size)
-
-            sd_card_params = \
-                ['-drive', 'file=' + sd_card_image_name
-                            + ',format=raw,id=mycard',
-                 '-device', 'sd-card,drive=mycard']
-
-        return sd_card_params
-
-    #---------------------------------------------------------------------------
     def start_qemu(self, print_log):
+
+        #-----------------------------------------------------------------------
+        class qemu_app_wrapper:
+            #-------------------------------------------------------------------
+            def __init__(self, binary, machine, cpu, memory):
+                self.binary = binary
+                self.machine = machine
+                self.cpu = cpu
+                self.memory = memory
+                self.kernel = None
+
+                # By default this is off, since we currently don't have any
+                # platform that uses this.
+                self.graphic = False
+
+                # enable for instruction tracing
+                self.singlestep = False
+
+                # SD card
+                self.sd_card_image = None
+                self.sd_card_size = None # set to truncate sd_card_image
+
+                # There can be multiple serial ports. Python guarantees the
+                # order is preserved when adding elements to an array.
+                self.serial_ports = []
+
+                self.params = [] # additional parameters
+
+            #-------------------------------------------------------------------
+            def add_params(self, *argv):
+                for arg in argv:
+                    if isinstance(arg, list):
+                        self.params.extend(arg)
+                    else:
+                        self.params.append(arg)
+
+            #-------------------------------------------------------------------
+            def start(
+                self,
+                log_file_stdout,
+                log_file_stderr,
+                printer = None,
+                print_log = False):
+
+                cmd_arr = []
+
+                if self.machine:
+                    cmd_arr += ['-machine', self.machine]
+
+                if self.cpu:
+                    cmd_arr += ['-cpu', self.cpu]
+
+                if self.memory:
+                    cmd_arr += ['-m', 'size={}M'.format(self.memory)]
+
+                if not self.graphic:
+                    cmd_arr += ['-nographic']
+
+                if self.singlestep:
+                    cmd_arr += ['-singlestep']
+
+                if self.kernel:
+                    cmd_arr += ['-kernel', self.kernel]
+
+                # connect all serial ports
+                for p in self.serial_ports:
+                    cmd_arr += ['-serial', p if p else 'null']
+
+                if self.sd_card_image:
+                    if ('spike' == self.machine):
+                        if printer:
+                            printer.print(
+                                'QEMU: ignoring SD card, not supported for {}'.format(
+                                    self.machine))
+                    else:
+                        if self.sd_card_size:
+                            # ToDo: maybe we should create a copy here and not
+                            #       modify the original file...
+                            with open(self.sd_card_image, 'wb') as sd_card_image:
+                                sd_card_image.truncate(self.sd_card_size)
+                        cmd_arr += [
+                            '-drive',
+                            'file={},format=raw,id=mycard'.format(self.sd_card_image),
+                            '-device', 'sd-card,drive=mycard'
+                        ]
+
+                cmd = [ self.binary ] + cmd_arr + self.params
+
+                if printer:
+                    printer.print('QEMU: {}'.format(' '.join(cmd)))
+
+                process = process_tools.ProcessWrapper(
+                            cmd,
+                            log_file_stdout = log_file_stdout,
+                            log_file_stderr = log_file_stderr,
+                            printer = printer,
+                            name = 'QEMU' )
+
+                process.start(print_log)
+
+                return process
+
+
+        #-----------------------------------------------------------------------
+        class qemu_aarch32(qemu_app_wrapper):
+            def __init__(self, machine, cpu, memory):
+                super().__init__(
+                    '/opt/hc/bin/qemu-system-arm',
+                    machine, cpu, memory)
+
+
+        #-----------------------------------------------------------------------
+        class qemu_aarch64(qemu_app_wrapper):
+            def __init__(self, machine, cpu, memory):
+                super().__init__('qemu-system-aarch64', machine, cpu, memory)
+
+
+        #-----------------------------------------------------------------------
+        class qemu_riscv64(qemu_app_wrapper):
+            def __init__(self, machine, cpu, memory):
+                super().__init__('qemu-system-riscv64', machine, cpu, memory)
+                # qemu-system-riscv64
+                #   -machine <'list' or one from the list>
+                #     none          empty machine
+                #     sifive_e      SiFive E SDK
+                #     sifive_u      SiFive U SDK
+                #     spike         (default)
+                #     spike_v1.10   (Privileged ISA v1.10)
+                #     spike_v1.9.1  (Privileged ISA v1.9.1)
+                #     virt          VirtIO board
+                #
+                #     dump the device tree with "<machine>,dumpdtb=dtb.out"
+                #
+                #   -cpu <'help' or one form the list>
+                #     any
+                #     rv64
+                #     rv64gcsu-v1.10.0
+                #     rv64gcsu-v1.9.1
+                #     rv64imacu-nommu
+                #     sifive-e51
+                #     sifive-u54
+                #
+
 
         assert( not self.is_qemu_running() )
 
-        qemu_mapping = {
-            # <plat>: ['<qemu-binary-arch>', '<qemu-machine>'],
-            'sabre':     ['/opt/hc/bin/qemu-system-arm', 'sabrelite'],
-            'migv':      ['qemu-system-riscv64'        , 'virt'],
-            'rpi3':      ['qemu-system-aarch64'        , 'raspi3'],
-            'spike':     ['qemu-system-riscv64'        , 'spike_v1.10'],
-            'zynq7000':  ['/opt/hc/bin/qemu-system-arm', 'xilinx-zynq-a9'],
+        qemu = {
+            'sabre':    qemu_aarch32('sabrelite', None, 1024),
+            'migv':     qemu_riscv64('virt', None, 1024),
+            'rpi3':     qemu_aarch64('raspi3', None, 1024),
+            'spike':    qemu_riscv64('spike', 'rv64', 4095),
+            'zynq7000': qemu_aarch32('xilinx-zynq-a9', None, 1024),
         }.get(self.run_context.platform, None)
 
-        assert(qemu_mapping is not None)
+        assert(qemu is not None)
 
-        cmd_arr = [
-            '{}'.format(qemu_mapping[0]),
-            '-machine', qemu_mapping[1],
-            '-m', 'size=1024M',
-            '-nographic',
-            # UART 0 is available for data exchange
-            '-serial', 'tcp:localhost:{},server'.format(self.qemu_uart_network_port),
-            # UART 1 is used for a syslog
-            '-serial', 'file:{}'.format(self.system_log_file.name),
-            '-kernel', self.run_context.system_image,
-        ]+ \
-        self.get_qemu_sd_card_params()
+        qemu.kernel = self.run_context.system_image
 
-        self.process_qemu = process_tools.ProcessWrapper(
-                                cmd_arr,
+        #qemu.singlestep = True
+        #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
+        #qemu.add_params('-d', 'in_asm') # logged to stderr
+        #qemu.add_params('-D', 'qemu_log.txt')
+
+        # Serial port connection is still a bit hacky, on the platforms we have
+        # so far, either there are two ports where UART0 is available for data
+        # exchange and UART1 is used for syslog. Or if there is only one serial
+        # port, then this one is used for syslog. Things would be simpler if
+        # we'd always use UART0 for syslog and additional UARTs for data
+        # exchange.
+        if (self.run_context.platform in ['sabre','zynq7000']):
+            # UART0
+            qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
+
+        # this is either UART0 or UART1 then.
+        qemu.serial_ports += ['file:{}'.format(self.system_log_file.name)]
+
+        # SD card (might be ignored if target does not support this)
+        if self.sd_card_size and (self.sd_card_size > 0):
+            qemu.sd_card_image = self.get_log_file_fqn('sdcard1.img')
+            qemu.sd_card_size = self.sd_card_size
+
+        # start QEMU
+        self.process_qemu = qemu.start(
                                 log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
                                 log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
                                 printer = self.run_context.printer,
-                                name = 'QEMU'
+                                print_log = print_log
                             )
-
-        self.print('starting QEMU: {}'.format(' '.join(cmd_arr)))
-        self.print('  QEMU stdout:   {}'.format(self.process_qemu.log_file_stdout))
-        self.print('  QEMU stderr:   {}'.format(self.process_qemu.log_file_stderr))
-
-        self.process_qemu.start(print_log)
 
         if print_log:
             # now that a QEMU process exists, start the monitor thread. The
