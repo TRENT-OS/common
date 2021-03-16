@@ -42,7 +42,7 @@ class TcpBridge():
         def socket_event_thread(thread):
 
             # this is a daemon thread that will be killed automatically when
-            # the main thread dies. Thus there is no abnort mechanism here
+            # the main thread dies. Thus there is no abort mechanism here
             while True:
 
                 for key, mask in self.sel.select():
@@ -277,6 +277,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.sd_card_size = run_context.sd_card_size
         self.proxy_cfg_str = proxy_cfg_str
 
+        # attach to QEMU UART via TCP bridge
         self.bridge = TcpBridge(self.run_context.printer)
 
         self.process_qemu = None
