@@ -448,6 +448,11 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert( not self.is_qemu_running() )
 
+        # Some platforms have a UART we can use freely. We should find a better
+        # place to configure this. Actually this is a part of the QEMU we will
+        # start, so we could move this into the constructor.
+        do_attach_to_uart = (self.run_context.platform in ['sabre','zynq7000'])
+
         qemu = {
             'sabre':    qemu_aarch32('sabrelite', None, 1024),
             'migv':     qemu_riscv64('virt', None, 1024),
@@ -471,7 +476,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # port, then this one is used for syslog. Things would be simpler if
         # we'd always use UART0 for syslog and additional UARTs for data
         # exchange.
-        if (self.run_context.platform in ['sabre','zynq7000']):
+        if (do_attach_to_uart):
             # UART0
             qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
 
@@ -509,16 +514,19 @@ class QemuProxyRunner(board_automation.System_Runner):
         # is not much gain if we sleep now hoping the files pop into existence.
         # The users of these files must handle the fact that they don't exist
         # at first and pop into existence eventually
-        # Next step is starting a TCP server to connect to QEMU's serial port.
-        # It depends on the system load how long the QEMU process itself takes
-        # to start and when QEMU's internal startup is done, so it is listening
-        # on the port. Tests showed that without system load, timeouts are
-        # rarely needed, but once there is a decent system load, even 500 ms
-        # may not be enough. With 5 seconds we should be safe.
-        self.bridge.connect_to_server(
-            '127.0.0.1',
-            self.qemu_uart_network_port,
-            Timeout_Checker(5))
+
+        if do_attach_to_uart:
+            # Starting a TCP server that connects to QEMU's serial port. It
+            # depends on the system load how long the QEMU process itself takes
+            # to start and when QEMU's internal startup is done, so it is
+            # listening on the port. Tests showed that without system load,
+            # timeouts are rarely needed, but once there is a decent system
+            # load, even 500 ms may not be enough. With 5 seconds we should be
+            # safe.
+            self.bridge.connect_to_server(
+                '127.0.0.1',
+                self.qemu_uart_network_port,
+                Timeout_Checker(5))
 
 
     #---------------------------------------------------------------------------
