@@ -154,7 +154,12 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
     #   - mcopy (part of the mtools package) copies the file from the linux host
     #     to the SD card image without having to mount the SD card first.
     for item in sd_content_list:
-        subprocess.check_call(['mcopy', '-i', sd_img_path, item[0], os.path.join('::/', item[1])])
+        subprocess.check_call([
+            'mcopy',
+            '-i',
+            sd_img_path,
+            item[0],
+            os.path.join('::/', item[1])])
 
 
 #-------------------------------------------------------------------------------

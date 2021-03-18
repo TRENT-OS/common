@@ -16,6 +16,7 @@ class Run_Context(object):
     def __init__(
         self,
         log_dir,
+        resource_dir,
         platform,
         system_image,
         sd_card_size,
@@ -23,6 +24,7 @@ class Run_Context(object):
         print_log = False):
 
         self.log_dir      = log_dir
+        self.resource_dir = resource_dir
         self.platform     = platform
         self.system_image = system_image
         self.sd_card_size = sd_card_size

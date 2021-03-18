@@ -446,6 +446,42 @@ class QemuProxyRunner(board_automation.System_Runner):
                 #
 
 
+        #-----------------------------------------------------------------------
+        class qemu_zcu102(qemu_app_wrapper):
+            def __init__(self, cpu, memory, res_path, dev_path):
+                super().__init__('/opt/xilinx-qemu/bin/qemu-system-aarch64',
+                                    None, cpu, memory)
+
+                if res_path == None:
+                    raise Exception('ERROR: qemu_zcu102 requires the resource path')
+                
+                self.add_params([
+                    '-machine', 'arm-generic-fdt',
+                    '-dtb', os.path.join(res_path, 'zcu102-arm.dtb'),
+                    '-device', 'loader,file={},cpu-num=0'.format(os.path.join(res_path, 'bl31.elf')),
+                    '-device', 'loader,file={}'.format(os.path.join(res_path, 'u-boot.elf')),
+                    '-global', 'xlnx,zynqmp-boot.cpu-num=0',
+                    '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
+                    '-machine-path', dev_path])
+
+
+        #-----------------------------------------------------------------------
+        class qemu_microblaze(qemu_app_wrapper):
+            def __init__(self, cpu, memory, res_path, dev_path):
+                super().__init__('/opt/xilinx-qemu/bin/qemu-system-microblazeel',
+                                    None, cpu, memory)
+
+                if res_path == None:
+                    raise Exception('ERROR: qemu_microblaze requires the resource path')
+                
+                self.add_params([
+                    '-machine', 'microblaze-fdt',
+                    '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
+                    '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
+                    '-device', 'loader,file={}'.format(os.path.join(res_path, 'pmufw.elf')),
+                    '-machine-path', dev_path])
+
+
         assert( not self.is_qemu_running() )
 
         # Some platforms have a UART we can use freely. We should find a better
@@ -459,6 +495,11 @@ class QemuProxyRunner(board_automation.System_Runner):
             'rpi3':     qemu_aarch64('raspi3', None, 1024),
             'spike':    qemu_riscv64('spike', 'rv64', 4095),
             'zynq7000': qemu_aarch32('xilinx-zynq-a9', None, 1024),
+            'zynqmp':   qemu_zcu102(None, 4096,
+                                    os.path.join(
+                                        self.run_context.resource_dir,
+                                        'zcu102_sd_card'),
+                                    self.run_context.log_dir),
         }.get(self.run_context.platform, None)
 
         assert(qemu is not None)
@@ -487,6 +528,37 @@ class QemuProxyRunner(board_automation.System_Runner):
         if self.sd_card_size and (self.sd_card_size > 0):
             qemu.sd_card_image = self.get_log_file_fqn('sdcard1.img')
             qemu.sd_card_size = self.sd_card_size
+
+        # Running test on the zynqmp requires 2 QEMU instances and passing
+        # additional parameters.
+        if self.run_context.platform == 'zynqmp':
+            # Since we are booting from the SD card the kernel image is not
+            # passed directly
+            qemu.kernel = None
+
+            # We do not want to truncate the SD card to a specific size
+            qemu.sd_card_size = None
+
+            # Creating an SD image that contains the system binary which will
+            # be booted by U-Boot
+            tools.create_sd_img(qemu.sd_card_image,
+                                128*1024*1024, # 128 MB
+                                [(self.run_context.system_image, 'os_image.elf')])
+
+            # Initializing the MicroBlaze based PMU QEMU instance
+            qemu_pmu_instance = qemu_microblaze(None, None,
+                                                os.path.join(
+                                                    self.run_context.resource_dir,
+                                                    'zcu102_sd_card'),
+                                                self.run_context.log_dir)
+
+            # Starting the MicroBlaze based PMU QEMU instance
+            self.process_qemu_pmu_instance = qemu_pmu_instance.start(
+                        log_file_stdout = self.get_log_file_fqn('qemu_pmu_out.txt'),
+                        log_file_stderr = self.get_log_file_fqn('qemu_pmu_err.txt'),
+                        printer = self.run_context.printer,
+                        print_log = print_log
+                    )
 
         # start QEMU
         self.process_qemu = qemu.start(

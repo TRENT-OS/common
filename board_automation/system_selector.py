@@ -12,6 +12,7 @@ from . import automation_RasPi_boardSetup
 #-------------------------------------------------------------------------------
 def get_test_runner(
         log_dir,
+        resource_dir,
         platform,
         system_image,
         proxy_config,
@@ -20,6 +21,7 @@ def get_test_runner(
 
     run_context = board_automation.Run_Context(
                     log_dir,
+                    resource_dir,
                     platform,
                     system_image,
                     sd_card_size,
@@ -27,6 +29,11 @@ def get_test_runner(
                     print_log)
 
     if (platform == 'sabre'):
+        return automation_QEMU.QemuProxyRunner(
+                        run_context,
+                        proxy_config)
+
+    if (platform == 'zynqmp'):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config)
