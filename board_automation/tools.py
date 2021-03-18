@@ -11,6 +11,7 @@ import threading
 import time
 import datetime
 import re
+import subprocess
 
 
 #-------------------------------------------------------------------------------
@@ -136,6 +137,24 @@ def find_usb_by_serial(serial):
                     get_id(dn, 'idProduct'),
                     dn))
             # no break here, serial may not be unique
+
+
+#-------------------------------------------------------------------------------
+def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
+    # Create SD image file
+    #   - Create a binary file and truncate to the received size.
+    with open(sd_img_path, "wb") as sd_image_file:
+        sd_image_file.truncate(sd_img_size)
+
+    # Format SD to a FAT32 FS
+    subprocess.check_call(['mkfs.fat', '-F 32', sd_img_path])
+
+    # Copy items to SD image:
+    #   - sd_content_list is a list of tuples: (HOST_OS_FILE_PATH, SD_FILE_PATH).
+    #   - mcopy (part of the mtools package) copies the file from the linux host
+    #     to the SD card image without having to mount the SD card first.
+    for item in sd_content_list:
+        subprocess.check_call(['mcopy', '-i', sd_img_path, item[0], os.path.join('::/', item[1])])
 
 
 #-------------------------------------------------------------------------------
