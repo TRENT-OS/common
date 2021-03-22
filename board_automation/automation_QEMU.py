@@ -454,7 +454,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 if res_path == None:
                     raise Exception('ERROR: qemu_zcu102 requires the resource path')
-                
+
                 self.add_params([
                     '-machine', 'arm-generic-fdt',
                     '-dtb', os.path.join(res_path, 'zcu102-arm.dtb'),
@@ -473,7 +473,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 if res_path == None:
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
-                
+
                 self.add_params([
                     '-machine', 'microblaze-fdt',
                     '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
