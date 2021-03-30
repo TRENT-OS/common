@@ -487,7 +487,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # Some platforms have a UART we can use freely. We should find a better
         # place to configure this. Actually this is a part of the QEMU we will
         # start, so we could move this into the constructor.
-        do_attach_to_uart = (self.run_context.platform in ['sabre','zynq7000'])
+        do_attach_to_uart = (self.run_context.platform in ['sabre','zynq7000','zynqmp'])
 
         qemu = {
             'sabre':    qemu_aarch32('sabrelite', None, 1024),
@@ -538,6 +538,12 @@ class QemuProxyRunner(board_automation.System_Runner):
 
             # We do not want to truncate the SD card to a specific size
             qemu.sd_card_size = None
+
+            # For sabre and zynq7000 UART0 is used for i/o tests and UART1 for
+            # syslog, and for zynqmp it is the other way around and this is why
+            # it is necessary to reverse this list since the elements order in
+            # the list corresponds to the UART assignements.
+            qemu.serial_ports.reverse()
 
             # Creating an SD image that contains the system binary which will
             # be booted by U-Boot
