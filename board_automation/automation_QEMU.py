@@ -220,6 +220,10 @@ class TcpBridge():
 
         peer = ('127.0.0.1', port)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # if we execute the test script in the container in quick succession
+        # the second execution would fail due to an unavailable port. 
+        # Setting it as reusable, allows us to avoid this failure case.
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind(peer)
         except:
