@@ -314,6 +314,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.binary = binary
                 self.machine = machine
                 self.cpu = cpu
+                self.cores = None
                 self.memory = memory
                 self.kernel = None
 
@@ -357,6 +358,9 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 if self.cpu:
                     cmd_arr += ['-cpu', self.cpu]
+
+                if self.cores:
+                    cmd_arr += ['-smp', str(self.cores)]
 
                 if self.memory:
                     cmd_arr += ['-m', 'size={}M'.format(self.memory)]
