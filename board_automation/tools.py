@@ -414,13 +414,19 @@ class Log_File(object):
             with f_log:
                 is_abort = False
                 while not is_abort:
-                    line = ''
+                    line = None
                     while True:
                         # readline() returns a string terminated by "\n" for
                         # every complete line. On timeout (ie. EOF reached),
                         # there is no terminating "\n".
-                        line += f_log.readline()
+                        chars_read = f_log.readline()
+                        if line is None:
+                            line = chars_read
+                        else:
+                            line += chars_read
+
                         if line.endswith('\n'):
+                            line = line.rstrip('\n')
                             # Unfortunately, there is a line break bug in some
                             # logs, where "\n\r" (LF+CR) is used instead of
                             # "\r\n" (CR+LF). Universal newline handling only
@@ -440,10 +446,10 @@ class Log_File(object):
                         # cause too much CPU load
                         time.sleep(0.1)
 
-                    if (len(line) > 0):
+                    if line is not None:
                         printer.print('[{}] {}'.format(
                             datetime.datetime.now() - start,
-                            line.strip()))
+                            line))
 
             # printer.print('[{}] monitor terminated for {}'.format(self, self.name))
 
