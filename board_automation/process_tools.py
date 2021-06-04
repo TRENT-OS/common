@@ -145,7 +145,7 @@ class ProcessWrapper:
                 # readline() can have a timeout
                 continue
 
-            line_str = line.strip().decode('utf-8')
+            line_str = line.decode('utf-8')
             line_str = line_str.replace('\b', '<BACKSPACE>')
 
             if f_log:
