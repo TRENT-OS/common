@@ -39,11 +39,10 @@ def get_test_runner(
                         automation_SabreLite_boardSetup.Board_Setup(
                             run_context.printer))
 
-    elif (platform == 'rpi3'):
+    if (platform == 'rpi3'):
         return automation_RasPi.BoardRunner(
                         run_context,
                         automation_RasPi_boardSetup.Board_Setup(
                             run_context.printer))
 
-    else:
-        raise Exception('unsupported platform: {}'.format(platform))
+    raise Exception('unsupported platform: {}'.format(platform))
