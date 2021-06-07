@@ -28,12 +28,7 @@ def get_test_runner(
                     tools.PrintSerializer(),
                     print_log)
 
-    if (platform == 'sabre'):
-        return automation_QEMU.QemuProxyRunner(
-                        run_context,
-                        proxy_config)
-
-    if (platform == 'zynqmp'):
+    if (platform in ['sabre', 'zynqmp', 'zynq7000']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config)
@@ -43,11 +38,6 @@ def get_test_runner(
                         run_context,
                         automation_SabreLite_boardSetup.Board_Setup(
                             run_context.printer))
-
-    elif (platform == 'zynq7000'):
-        return automation_QEMU.QemuProxyRunner(
-                        run_context,
-                        proxy_config)
 
     elif (platform == 'rpi3'):
         return automation_RasPi.BoardRunner(
