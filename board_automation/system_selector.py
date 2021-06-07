@@ -19,6 +19,11 @@ def get_test_runner(
         sd_card_size,
         print_log = False ):
 
+    # translate generic platform names
+    if (platform == 'spike'):
+        print('translating PLATFORM: spike -> spike64')
+        platform = 'spike64'
+
     run_context = board_automation.Run_Context(
                     log_dir,
                     resource_dir,
@@ -28,7 +33,12 @@ def get_test_runner(
                     tools.PrintSerializer(),
                     print_log)
 
-    if (platform in ['sabre', 'zynqmp', 'zynq7000', 'spike']):
+    if (platform in [
+            'sabre',
+            'zynqmp',
+            'zynq7000',
+            'spike32',
+            'spike64' ]):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config)

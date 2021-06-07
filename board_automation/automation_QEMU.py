@@ -447,7 +447,11 @@ class QemuProxyRunner(board_automation.System_Runner):
                 #     rv64imacu-nommu
                 #     sifive-e51
                 #     sifive-u54
-                #
+
+        #-----------------------------------------------------------------------
+        class qemu_riscv32(qemu_app_wrapper):
+            def __init__(self, machine, cpu, memory):
+                super().__init__('qemu-system-riscv32', machine, cpu, memory)
 
 
         #-----------------------------------------------------------------------
@@ -497,7 +501,8 @@ class QemuProxyRunner(board_automation.System_Runner):
             'sabre':    qemu_aarch32('sabrelite', None, 1024),
             'migv':     qemu_riscv64('virt', None, 1024),
             'rpi3':     qemu_aarch64('raspi3', None, 1024),
-            'spike':    qemu_riscv64('spike', 'rv64', 4095),
+            'spike64':  qemu_riscv64('spike', 'rv64', 4095),
+            'spike32':  qemu_riscv32('spike', 'rv32', 1024),
             'zynq7000': qemu_aarch32('xilinx-zynq-a9', None, 1024),
             'zynqmp':   qemu_zcu102(None, 4096,
                                     os.path.join(
