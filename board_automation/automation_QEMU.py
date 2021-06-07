@@ -316,6 +316,13 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.cpu = cpu
                 self.cores = None
                 self.memory = memory
+
+                # 'kernel' is the common option to boot an OS like Linux, 'bios'
+                # is machine specific to load firmware. On RISC-V, 'bios' allows
+                # booting the system in M-Mode and install a custom SBI, while
+                # 'kernel' will make QEMU use an OpenSBI firmware that comes
+                # with QEMU and boot the given OS in S-Mode.
+                self.bios = None
                 self.kernel = None
 
                 # By default this is off, since we currently don't have any
@@ -373,6 +380,9 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 if self.kernel:
                     cmd_arr += ['-kernel', self.kernel]
+
+                if self.bios:
+                    cmd_arr += ['-bios', self.bios]
 
                 # connect all serial ports
                 for p in self.serial_ports:
@@ -517,7 +527,14 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert(qemu is not None)
 
-        qemu.kernel = self.run_context.system_image
+        if self.run_context.platform in ['spike32', 'spike64']:
+            # Seems older QEMU versions do not support the 'bios' parameter, so
+            # we can't use
+            #   qemu.bios = self.run_context.system_image
+            # and have to stick to loading a kernel
+            qemu.kernel = self.run_context.system_image
+        else:
+            qemu.kernel = self.run_context.system_image
 
         #qemu.singlestep = True
         #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
