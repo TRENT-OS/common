@@ -28,7 +28,7 @@ def get_test_runner(
                     tools.PrintSerializer(),
                     print_log)
 
-    if (platform in ['sabre', 'zynqmp', 'zynq7000']):
+    if (platform in ['sabre', 'zynqmp', 'zynq7000', 'spike']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config)
