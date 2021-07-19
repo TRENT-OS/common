@@ -8,6 +8,8 @@ from . import automation_SabreLite_boardSetup
 from . import automation_RasPi
 from . import automation_RasPi_boardSetup
 from . import automation_zcu102
+from . import automation_MigV
+from . import automation_MigV_boardSetup
 
 
 #-------------------------------------------------------------------------------
@@ -56,5 +58,11 @@ def get_test_runner(run_context):
             'migv',
             'zcu102']):
         return automation_zcu102.BoardRunner(run_context)
+
+    if (platform == 'migv'):
+        return automation_MigV.BoardRunner(
+                        run_context,
+                        automation_MigV_boardSetup.Board_Setup(
+                            run_context.printer))
 
     raise Exception(f'unsupported platform: {run_context.platform}')
