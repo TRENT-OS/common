@@ -56,7 +56,7 @@ class FTDI_CBUS_GPIO:
 #   FT2232C/D/L, FT2232HL/Q                         | 0x6010
 #   FT4232HL/Q                                      | 0x6011
 #   FT232HL/Q                                       | 0x6014
-#   FT200XD                                         | 0x6015
+#   FT200XD, FT231X                                 | 0x6015
 #
 def list_devices(vid = 0x0403):
     def get_id_from_file(dn, id_file):
