@@ -6,9 +6,17 @@ import time
 
 from . import tools
 from . import process_tools
+from enum import Enum
 
 #===============================================================================
 #===============================================================================
+
+#-------------------------------------------------------------------------------
+class BootMode(Enum):
+    BARE_METAL  = 1
+    SEL4_NATIVE = 2
+    SEL4_CAMKES = 3
+
 
 class Run_Context(object):
 
@@ -116,7 +124,12 @@ class System_Runner(object):
 
     #---------------------------------------------------------------------------
     # sub-classes may overwrite this
-    def check_start_success(self, is_native_system = False):
+    def check_start_success(self, boot_mode = BootMode.BARE_METAL):
+
+        # The initial boot output of a bare-metal system is fully custom so it
+        # is not necessary to perform any checks here.
+        if boot_mode == BootMode.BARE_METAL:
+            return
 
         (ret , idx, idx2) = self.system_log_match_multiple_sequences([
 
@@ -138,7 +151,7 @@ class System_Runner(object):
             raise Exception('boot string #{}.{} not found'.format(idx, idx2))
 
         # There is no CapDL loader in a native system.
-        if is_native_system:
+        if boot_mode == BootMode.SEL4_NATIVE:
             return
 
         (ret , idx, idx2) = self.system_log_match_multiple_sequences([
