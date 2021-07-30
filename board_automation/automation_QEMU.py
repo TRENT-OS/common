@@ -543,21 +543,34 @@ class QemuProxyRunner(board_automation.System_Runner):
         #qemu.add_params('-d', 'in_asm') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
-        # Serial port connections are platform specific. On 'sabre' and
-        # 'zynq7000' UART0 is available for data exchange and UART1 is used for
-        # syslog. On 'zynqmp' and 'hifive', it's the other way around, UART0 is
-        # kernel log and UART1 is for data. On other platforms with one serial
-        # port only, this one is used for syslog.
+        # Serial port usage is platform specific. On platforms with one serial
+        # port only, this one is used for syslog. If there are multiple UARTs,
+        # some platforms have the syslog on UART_0 and UART_1 is available for
+        # data exchange. Others do it the other way around, UART_0 is available
+        # for data exchange and UART_1 is used for the syslog.
+        uart_syslog = 'file:{}'.format(self.system_log_file.name)
+        has_syslog_on_uart_1 = self.run_context.platform in ['sabre',
+                                                             'zynq7000',
+                                                             'hifive']
         has_data_uart = (self.run_context.platform in ['sabre',
                                                        'zynq7000',
                                                        'zynqmp',
                                                        'hifive'])
-        uart_syslog = 'file:{}'.format(self.system_log_file.name)
-        if self.run_context.platform in ['hifive', 'zynqmp']:
+        assert(0 == len(qemu.serial_ports))
+        if not has_syslog_on_uart_1:
+            # UART 0 is syslog
             qemu.serial_ports += [uart_syslog]
+
         if (has_data_uart):
+            # UART 0 or UART 1 is used for data
             qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
-        if self.run_context.platform in ['sabre', 'zynq7000']:
+        elif has_syslog_on_uart_1:
+            # UART 0 must be a dummy in this case
+            assert(0 == len(qemu.serial_ports))
+            qemu.serial_ports += ['null']
+
+        if has_syslog_on_uart_1:
+            assert(1 == len(qemu.serial_ports))
             qemu.serial_ports += [uart_syslog]
 
         # SD card (might be ignored if target does not support this)
