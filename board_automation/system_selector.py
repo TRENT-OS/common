@@ -38,7 +38,8 @@ def get_test_runner(
             'zynqmp',
             'zynq7000',
             'spike32',
-            'spike64' ]):
+            'spike64',
+            'hifive']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config)

@@ -389,7 +389,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     cmd_arr += ['-serial', p if p else 'null']
 
                 if self.sd_card_image:
-                    if ('spike' == self.machine):
+                    if (self.machine in ['spike', 'sifive_u']):
                         if printer:
                             printer.print(
                                 'QEMU: ignoring SD card, not supported for {}'.format(
@@ -509,6 +509,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         qemu = {
             'sabre':    qemu_aarch32('sabrelite', None, 1024),
             'migv':     qemu_riscv64('virt', None, 1024),
+            'hifive':   qemu_riscv64('sifive_u', None, 8192),
             'rpi3':     qemu_aarch64('raspi3', None, 1024),
             'spike64':  qemu_riscv64('spike', 'rv64', 4095),
             'spike32':  qemu_riscv32('spike', 'rv32', 1024),
@@ -528,6 +529,12 @@ class QemuProxyRunner(board_automation.System_Runner):
             #   qemu.bios = self.run_context.system_image
             # and have to stick to loading a kernel
             qemu.kernel = self.run_context.system_image
+        elif self.run_context.platform in ['hifive']:
+            qemu.bios = self.run_context.system_image
+            # The platform has 1x E51 and 4x U54. In QEMU, the E51 and one U54
+            # always exist, setting qemu.cores = 3,4,5 can be used to activate
+            # additional U54 cores.
+            # qemu.cores = 5
         else:
             qemu.kernel = self.run_context.system_image
 
@@ -538,12 +545,15 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         # Serial port connections are platform specific. On 'sabre' and
         # 'zynq7000' UART0 is available for data exchange and UART1 is used for
-        # syslog. On 'zynqmp' it's the other way around, UART0 is kernel log and
-        # UART1 is for data. On other platforms with one serial port only, this
-        # one is used for syslog.
-        has_data_uart = (self.run_context.platform in ['sabre','zynq7000','zynqmp'])
-        conn_uart_syslog = 'file:{}'.format(self.system_log_file.name)
-        if self.run_context.platform in ['zynqmp']:
+        # syslog. On 'zynqmp' and 'hifive', it's the other way around, UART0 is
+        # kernel log and UART1 is for data. On other platforms with one serial
+        # port only, this one is used for syslog.
+        has_data_uart = (self.run_context.platform in ['sabre',
+                                                       'zynq7000',
+                                                       'zynqmp',
+                                                       'hifive'])
+        uart_syslog = 'file:{}'.format(self.system_log_file.name)
+        if self.run_context.platform in ['hifive', 'zynqmp']:
             qemu.serial_ports += [uart_syslog]
         if (has_data_uart):
             qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
