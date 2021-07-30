@@ -506,11 +506,6 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert( not self.is_qemu_running() )
 
-        # Some platforms have a UART we can use freely. We should find a better
-        # place to configure this. Actually this is a part of the QEMU we will
-        # start, so we could move this into the constructor.
-        do_attach_to_uart = (self.run_context.platform in ['sabre','zynq7000','zynqmp'])
-
         qemu = {
             'sabre':    qemu_aarch32('sabrelite', None, 1024),
             'migv':     qemu_riscv64('virt', None, 1024),
@@ -541,18 +536,19 @@ class QemuProxyRunner(board_automation.System_Runner):
         #qemu.add_params('-d', 'in_asm') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
-        # Serial port connection is still a bit hacky, on the platforms we have
-        # so far, either there are two ports where UART0 is available for data
-        # exchange and UART1 is used for syslog. Or if there is only one serial
-        # port, then this one is used for syslog. Things would be simpler if
-        # we'd always use UART0 for syslog and additional UARTs for data
-        # exchange.
-        if (do_attach_to_uart):
-            # UART0
+        # Serial port connections are platform specific. On 'sabre' and
+        # 'zynq7000' UART0 is available for data exchange and UART1 is used for
+        # syslog. On 'zynqmp' it's the other way around, UART0 is kernel log and
+        # UART1 is for data. On other platforms with one serial port only, this
+        # one is used for syslog.
+        has_data_uart = (self.run_context.platform in ['sabre','zynq7000','zynqmp'])
+        conn_uart_syslog = 'file:{}'.format(self.system_log_file.name)
+        if self.run_context.platform in ['zynqmp']:
+            qemu.serial_ports += [uart_syslog]
+        if (has_data_uart):
             qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
-
-        # this is either UART0 or UART1 then.
-        qemu.serial_ports += ['file:{}'.format(self.system_log_file.name)]
+        if self.run_context.platform in ['sabre', 'zynq7000']:
+            qemu.serial_ports += [uart_syslog]
 
         # SD card (might be ignored if target does not support this)
         if self.sd_card_size and (self.sd_card_size > 0):
@@ -568,12 +564,6 @@ class QemuProxyRunner(board_automation.System_Runner):
 
             # We do not want to truncate the SD card to a specific size
             qemu.sd_card_size = None
-
-            # For sabre and zynq7000 UART0 is used for i/o tests and UART1 for
-            # syslog, and for zynqmp it is the other way around and this is why
-            # it is necessary to reverse this list since the elements order in
-            # the list corresponds to the UART assignements.
-            qemu.serial_ports.reverse()
 
             # Creating an SD image that contains the system binary which will
             # be booted by U-Boot
@@ -623,7 +613,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # The users of these files must handle the fact that they don't exist
         # at first and pop into existence eventually
 
-        if do_attach_to_uart:
+        if has_data_uart:
             # Starting a TCP server that connects to QEMU's serial port. It
             # depends on the system load how long the QEMU process itself takes
             # to start and when QEMU's internal startup is done, so it is
