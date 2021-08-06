@@ -274,12 +274,13 @@ class QemuProxyRunner(board_automation.System_Runner):
     port_cnt_lock = threading.Lock()
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context, proxy_cfg_str = None):
+    def __init__(self, run_context, proxy_cfg_str = None, additional_params = None):
 
         super().__init__(run_context, None)
 
         self.sd_card_size = run_context.sd_card_size
         self.proxy_cfg_str = proxy_cfg_str
+        self.additional_params = additional_params
 
         # attach to QEMU UART via TCP bridge
         self.bridge = TcpBridge(self.run_context.printer)
@@ -355,6 +356,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self,
                 log_file_stdout,
                 log_file_stderr,
+                aditional_params = None,
                 printer = None,
                 print_log = False):
 
@@ -405,6 +407,9 @@ class QemuProxyRunner(board_automation.System_Runner):
                             'file={},format=raw,id=mycard'.format(self.sd_card_image),
                             '-device', 'sd-card,drive=mycard'
                         ]
+
+                if aditional_params:
+                    cmd_arr += aditional_params
 
                 cmd = [ self.binary ] + cmd_arr + self.params
 
@@ -613,6 +618,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.process_qemu = qemu.start(
                                 log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
                                 log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
+                                aditional_params = self.additional_params,
                                 printer = self.run_context.printer,
                                 print_log = print_log
                             )

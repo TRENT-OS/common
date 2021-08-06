@@ -17,6 +17,7 @@ def get_test_runner(
         system_image,
         proxy_config,
         sd_card_size,
+        additional_qemu_params = None,
         print_log = False ):
 
     # translate generic platform names
@@ -42,7 +43,8 @@ def get_test_runner(
             'hifive']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
-                        proxy_config)
+                        proxy_config,
+                        additional_qemu_params)
 
     if (platform == 'sabre-hw'):
         return automation_SabreLite.BoardRunner(
