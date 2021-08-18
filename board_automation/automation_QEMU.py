@@ -555,8 +555,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # for data exchange and UART_1 is used for the syslog.
         uart_syslog = 'file:{}'.format(self.system_log_file.name)
         has_syslog_on_uart_1 = self.run_context.platform in ['sabre',
-                                                             'zynq7000',
-                                                             'hifive']
+                                                             'zynq7000']
         has_data_uart = (self.run_context.platform in ['sabre',
                                                        'zynq7000',
                                                        'zynqmp',
