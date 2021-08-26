@@ -8,6 +8,8 @@ from . import automation_SabreLite_boardSetup
 from . import automation_RasPi
 from . import automation_RasPi_boardSetup
 from . import automation_zcu102
+from . import automation_RasPi4
+from . import automation_RasPi4_boardSetup
 
 
 #-------------------------------------------------------------------------------
@@ -71,6 +73,12 @@ def get_test_runner(
         return automation_RasPi.BoardRunner(
                         run_context,
                         automation_RasPi_boardSetup.Board_Setup(
+                            run_context.printer))
+
+    if (platform == 'rpi4'):
+        return automation_RasPi4.BoardRunner(
+                        run_context,
+                        automation_RasPi4_boardSetup.Board_Setup(
                             run_context.printer))
 
     if (platform in [
