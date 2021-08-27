@@ -366,12 +366,14 @@ class Log_File(object):
             timeout = None,
             newline = None, # use universal newline mode by default
             mode = 'rt', # read-only text file
+            encoding = 'latin-1', # avoid utf-8 and stick to single-byte chars
             checker_func = None ):
 
         while True:
 
             if os.path.isfile(self.name):
-                f = open(self.name, mode, newline=newline)
+                f = open(self.name, mode=mode, encoding=encoding,
+                         newline=newline)
                 if f:
                     fd = f.fileno()
                     flag = fcntl.fcntl(fd, fcntl.F_GETFL)
