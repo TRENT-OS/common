@@ -147,7 +147,7 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
         sd_image_file.truncate(sd_img_size)
 
     # Format SD to a FAT32 FS
-    subprocess.check_call(['mkfs.fat', '-F 32', sd_img_path])
+    subprocess.check_call(['mkfs.fat', '-F', '32', sd_img_path])
 
     # Copy items to SD image:
     #   - sd_content_list is a list of tuples: (HOST_OS_FILE_PATH, SD_FILE_PATH).
