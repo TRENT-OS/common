@@ -159,5 +159,5 @@ class BoardRunner(board_automation.System_Runner):
     def get_serial_socket(self):
         if(self.port is None):
             tty_usb = self.board_setup.uart1
-            self.port = serial.Serial(tty_usb.device, 115200, timeout=1)
+            self.port = serial.Serial(tty_usb.device, 76800, timeout=1)
         return self.port
