@@ -409,7 +409,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                         ]
 
                 if aditional_params:
-                    cmd_arr += aditional_params
+                    for param in aditional_params:
+                        cmd_arr += param
 
                 cmd = [ self.binary ] + cmd_arr + self.params
 
