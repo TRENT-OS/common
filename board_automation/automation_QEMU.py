@@ -4,9 +4,8 @@ import sys
 import traceback
 import socket
 import selectors
-import time
 import os
-import subprocess
+from enum import IntEnum
 
 from . import tools
 from .tools import Timeout_Checker
@@ -351,6 +350,23 @@ class QemuProxyRunner(board_automation.System_Runner):
                     else:
                         self.params.append(arg)
 
+
+            #-------------------------------------------------------------------------------
+            class Additional_Param_Type(IntEnum):
+                VALUE       = 0,
+                BINARY_IMG  = 1,
+
+
+            #-------------------------------------------------------------------------------
+            def param_mem_blob(self, address, blob):
+                return ['-device', 'loader,addr={},file={},'.format(address, blob)]
+
+
+            #-------------------------------------------------------------------------------
+            def param_mem_value(self, address, value):
+                return ['-device', 'loader,addr={},data={},data-len=4'.format(address, value)]
+
+
             #-------------------------------------------------------------------
             def start(
                 self,
@@ -410,7 +426,13 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 if aditional_params:
                     for param in aditional_params:
-                        cmd_arr += param
+                        if param[2] == self.Additional_Param_Type.VALUE:
+                            cmd_arr += self.param_mem_value(param[0], param[1])
+                        elif param[2] == self.Additional_Param_Type.BINARY_IMG:
+                            cmd_arr += self.param_mem_blob(param[0], param[1])
+                        else:
+                            printer.print('QEMU: additional parameter type {} \
+                                not supported!'.format(param[2]))
 
                 cmd = [ self.binary ] + cmd_arr + self.params
 

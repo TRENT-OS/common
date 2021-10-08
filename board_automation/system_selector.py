@@ -7,6 +7,7 @@ from . import automation_SabreLite
 from . import automation_SabreLite_boardSetup
 from . import automation_RasPi
 from . import automation_RasPi_boardSetup
+from . import automation_zcu102
 
 
 #-------------------------------------------------------------------------------
@@ -57,5 +58,13 @@ def get_test_runner(
                         run_context,
                         automation_RasPi_boardSetup.Board_Setup(
                             run_context.printer))
+
+    if (platform in [
+            'migv',
+            'hcsc1_fpga',
+            'zcu102']):
+        return automation_zcu102.BoardRunner(
+                        run_context,
+                        additional_params)
 
     raise Exception('unsupported platform: {}'.format(platform))
