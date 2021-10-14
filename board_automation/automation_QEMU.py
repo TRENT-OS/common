@@ -6,6 +6,7 @@ import socket
 import selectors
 import os
 from enum import IntEnum
+import socket
 
 from . import tools
 from .tools import Timeout_Checker
@@ -295,6 +296,9 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.qemu_uart_network_port = base_port
         self.proxy_network_port     = base_port + 1
 
+        self.qemu_uart_log_host     = 'localhost'
+        self.qemu_uart_log_port     = base_port + 2
+
     #---------------------------------------------------------------------------
     def is_qemu_running(self):
         return self.process_qemu and self.process_qemu.is_running()
@@ -303,6 +307,14 @@ class QemuProxyRunner(board_automation.System_Runner):
     #---------------------------------------------------------------------------
     def is_proxy_running(self):
         return self.process_proxy and self.process_proxy.is_running()
+
+
+    #---------------------------------------------------------------------------
+    def send_data_to_uart(self, data):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.qemu_uart_log_host, self.qemu_uart_log_port))
+            s.sendall(str.encode(data))
+
 
     #---------------------------------------------------------------------------
     def start_qemu(self, print_log):
@@ -349,6 +361,19 @@ class QemuProxyRunner(board_automation.System_Runner):
                         self.params.extend(arg)
                     else:
                         self.params.append(arg)
+
+
+            #-------------------------------------------------------------------
+            def sys_log_setup(self, sys_log_path, host, port, id):
+                # In adition to outputting the guest system log to a log file,
+                # we are openning a 2-way TCP socket connected to the same
+                # serial device that allows the test suite to communicate with
+                # the guest during the test execution.
+                self.add_params([
+                    '-chardev',
+                    'socket,id=char{},port={},host={},server,nowait,logfile={},signal=off'.format(
+                        id, port, host, sys_log_path)])
+                self.serial_ports += ['chardev:char{}'.format(id)]
 
 
             #-------------------------------------------------------------------------------
@@ -576,7 +601,6 @@ class QemuProxyRunner(board_automation.System_Runner):
         # some platforms have the syslog on UART_0 and UART_1 is available for
         # data exchange. Others do it the other way around, UART_0 is available
         # for data exchange and UART_1 is used for the syslog.
-        uart_syslog = 'file:{}'.format(self.system_log_file.name)
         has_syslog_on_uart_1 = self.run_context.platform in ['sabre',
                                                              'zynq7000']
         has_data_uart = (self.run_context.platform in ['sabre',
@@ -586,7 +610,11 @@ class QemuProxyRunner(board_automation.System_Runner):
         assert(0 == len(qemu.serial_ports))
         if not has_syslog_on_uart_1:
             # UART 0 is syslog
-            qemu.serial_ports += [uart_syslog]
+            qemu.sys_log_setup(
+                self.system_log_file.name,
+                self.qemu_uart_log_host,
+                self.qemu_uart_log_port,
+                0)
 
         if (has_data_uart):
             # UART 0 or UART 1 is used for data
@@ -598,7 +626,12 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         if has_syslog_on_uart_1:
             assert(1 == len(qemu.serial_ports))
-            qemu.serial_ports += [uart_syslog]
+            # UART 1 is syslog
+            qemu.sys_log_setup(
+                self.system_log_file.name,
+                self.qemu_uart_log_host,
+                self.qemu_uart_log_port,
+                1)
 
         # SD card (might be ignored if target does not support this)
         if self.sd_card_size and (self.sd_card_size > 0):

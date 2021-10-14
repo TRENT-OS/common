@@ -401,6 +401,57 @@ class BoardRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
+    def send_data_to_uart(self, data):
+        self.board.execute_ssh_command('printf "{}" > {}'.format(
+            data, self.board.uart_device_id), 'send_to_uart')
+
+
+    #---------------------------------------------------------------------------
+    def send_file_to_uart(self, file):
+        # Copy the file to send to the remote
+        subprocess.run(
+            "scp -i {} {} {}@{}:bmrbl/{}".
+                format(self.board.remote_access_key,
+                        file,
+                        self.board.remote_access_username,
+                        self.board.remote_access_ip,
+                        os.path.basename(file)),
+                        shell=True)
+
+        # Send the file using the sender utility on the remote
+        self.board.execute_ssh_command(
+            'python3 bmrbl/srec_sender.py \
+                --srec-file bmrbl/{} \
+                --serial-port {}' \
+            .format(
+                os.path.basename(file),
+                self.board.uart_device_id),
+            'send_file_to_uart')
+
+        # Wait until the sending is complete (max 60s)
+        with open('{}/send_file_to_uart_out.txt'.format(self.board.log_dir), 'r') as fout:
+            timeout = time.time() + 60
+            while(True):
+                time.sleep(1)
+                output = fout.read()
+                if 'Sending SREC data complete' in output or time.time() > timeout:
+                    break
+
+        # Wait some time for the system to boot the loaded SREC file
+        time.sleep(3)
+
+        # Remove the file
+        self.board.execute_ssh_command(
+            'rm bmrbl/{}'.format(os.path.basename(file)),
+            'remove_file')
+
+
+    #---------------------------------------------------------------------------
+    def get_logs(self):
+        self.board.extract_log()
+
+
+    #---------------------------------------------------------------------------
     # interface board_automation.System_Runner
     def do_cleanup(self):
         self.process_serial_capture.kill()
