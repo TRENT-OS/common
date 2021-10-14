@@ -157,7 +157,8 @@ class Automation(object):
         while cnt < 3:
             with open('{}/openocd_err.txt'.format(self.log_dir), 'r') as ferr:
                 log_data = ferr.read()
-                if 'Error:' in log_data in log_data:
+                if not 'Info : Listening on port {} for gdb connections'.format(self.gdb_port) in log_data \
+                    or 'Error' in log_data:
                     self.print('Openocd failed! Retrying...')
 
                     # If openocd failed to launch the safest thing is to kill
@@ -351,7 +352,7 @@ class Automation(object):
         # and power off the board
         self.execute_ssh_command('pkill -9 openocd', 'kill_openocd')
         time.sleep(0.5)
-        self.execute_ssh_command('pkill -9 minicom', 'kill_serial_capture')
+        self.execute_ssh_command('pkill -9 picocom', 'kill_serial_capture')
         time.sleep(0.5)
         self.execute_ssh_command('screen -S {} -X quit'.format(self.screen_session), 'kill_screen')
         time.sleep(0.5)
