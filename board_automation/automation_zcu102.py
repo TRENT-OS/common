@@ -57,6 +57,7 @@ class Automation(object):
             pytest.fail("Parsing platform configuration failed!")
 
         self.log_dir                = log_dir
+        self.screen_session         = 'serial_{}'.format(time.time())
 
         # Since the OTP values are received in 32-bit register values (for QEMU
         # compatibility), we need to keep track of the number of these values to
@@ -308,9 +309,15 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def start_serial_capture(self):
+        # We start a screen session on the remote test controller in detached
+        # mode (-dmS) and start a picocom instance in it, since picocom requires
+        # a live terminal. The picocom logs all captured data to the
+        # "board_output_log" file which is later parsed by the test case.
         return self.execute_ssh_command(
-                'screen -dmS serial bash && \
-                 screen -S serial -X stuff "picocom -b 115200 {} -g {}\n"'.format(
+                'screen -dmS {} bash && \
+                 screen -S {} -X stuff "picocom -b 115200 {} -g {}\n"'.format(
+                    self.screen_session,
+                    self.screen_session,
                     self.uart_device_id, 
                     self.board_output_log                         
                 ), 'serial')
@@ -346,7 +353,7 @@ class Automation(object):
         time.sleep(0.5)
         self.execute_ssh_command('pkill -9 minicom', 'kill_serial_capture')
         time.sleep(0.5)
-        self.execute_ssh_command('screen -S serial -X quit', 'kill_screen')
+        self.execute_ssh_command('screen -S {} -X quit'.format(self.screen_session), 'kill_screen')
         time.sleep(0.5)
         self.execute_ssh_command('rm -f {}'.format(self.board_output_log), 'remove_log')
         time.sleep(0.5)
