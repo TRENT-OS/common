@@ -125,7 +125,6 @@ class System_Runner(object):
     #---------------------------------------------------------------------------
     # sub-classes may overwrite this
     def check_start_success(self, boot_mode = BootMode.BARE_METAL):
-
         # The initial boot output of a bare-metal system is fully custom so it
         # is not necessary to perform any checks here.
         if boot_mode == BootMode.BARE_METAL:
@@ -135,7 +134,7 @@ class System_Runner(object):
 
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
-            ( [ 'ELF-loader started' ], 10 ),
+            ( [ 'ELF-loader started' ], 20 ),
 
             # give the ELF Loader 10 seconds to unpack the system. Some
             # platforms print "Jumping to kernel-image entry point..." when

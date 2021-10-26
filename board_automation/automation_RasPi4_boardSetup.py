@@ -31,29 +31,27 @@ class Board_Setup():
         #                     })
 
         # self.sd_wire = sd_wire.SD_Wire(
-        #             serial     = '202005170015',
-        #             usb_path   = '1-4.2.1.4.2.2',
+        #             serial     = '202005170001',
+        #             usb_path   = '1-1.2.2',
         #             mountpoint = '/media')
 
 
-        # self.uart0 = uart_reader.TTY_USB.find_device(
-        #                 # FTDI 232 USB/Serial adapter
-        #                 serial    = None,
-        #                 usb_path  = '1-2.1'
-        #              )
+        self.uart0 = uart_reader.TTY_USB.find_device(
+                        # FTDI 232 USB/Serial adapter
+                        serial    = None,
+                        usb_path  = '1-2.2'
+                     )
 
         self.uart1 = uart_reader.TTY_USB.find_device(
                         # FTDI 232 USB/Serial adapter
                         serial    = None,
-                        usb_path  = '1-2.3'
+                        usb_path  = '1-2.4'
                      )
 
-        print("serial_socket = " + self.uart1.device)
-
-        # self.log_monitor = uart_reader.UART_Reader(
-        #                         device  = self.uart0.device,
-        #                         name = 'UART0',
-        #                         printer = self.printer)
+        self.log_monitor = uart_reader.UART_Reader(
+                                device  = self.uart0.device,
+                                name = 'UART0',
+                                printer = self.printer)
 
 
     #---------------------------------------------------------------------------
@@ -63,8 +61,8 @@ class Board_Setup():
         # if self.gpio:
         #     self.gpio.close()
 
-        # if self.log_monitor:
-        #     self.log_monitor.stop()
+        if self.log_monitor:
+            self.log_monitor.stop()
 
         # if self.sd_wire:
         #     self.sd_wire.switch_to_host()

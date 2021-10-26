@@ -140,12 +140,12 @@ class BoardRunner(board_automation.System_Runner):
 
         # self.board_setup.sd_wire.unmount_and_switch_to_device(timeout_sec = 5)
 
-        # # now the board is ready to boot, enable the UART logger and switch
-        # # the power on
-        # self.board_setup.log_monitor.start(
-        #     log_file = self.system_log_file.name,
-        #     print_log = print_log)
-        # time.sleep(0.1)
+        # now the board is ready to boot, enable the UART logger and switch
+        # the power on
+        self.board_setup.log_monitor.start(
+            log_file = self.system_log_file.name,
+            print_log = print_log)
+        time.sleep(0.1)
 
         # self.board.boot_internal()
 
