@@ -290,7 +290,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         QemuProxyRunner.port_cnt_lock.acquire()
         base_port = QemuProxyRunner.qemu_uart_network_port
-        QemuProxyRunner.qemu_uart_network_port += 2
+        QemuProxyRunner.qemu_uart_network_port += 4
         QemuProxyRunner.port_cnt_lock.release()
 
         self.qemu_uart_network_port = base_port
