@@ -7,6 +7,7 @@ from enum import IntEnum
 from pathlib import Path
 from pytest_testconfig import config
 import pytest
+from fabric import Connection
 
 from . import board_automation
 
@@ -37,7 +38,7 @@ class Automation(object):
 
             self.remote_access_ip       = config['remote_access']['remote_access_ip']
             self.remote_access_username = config['remote_access']['remote_access_username']
-            self.remote_access_key      = next(Path(os.getcwd()).parent.parent.rglob(
+            self.remote_access_key      = next(Path(os.getcwd()).rglob(
                                             config['remote_access']['remote_access_key']))
 
             self.remote_power_utility   = config['remote_access']['remote_power_utility']
@@ -53,6 +54,7 @@ class Automation(object):
             self.uart_baud_rate         = config['platform']['uart_baud_rate']
 
             self.board_output_log       = config['resources']['board_output_log']
+            self.openocd_log_remote     = config['resources']['openocd_log']
         except:
             pytest.fail("Parsing platform configuration failed!")
 
@@ -66,6 +68,12 @@ class Automation(object):
 
         self.printer      = printer
 
+        # Object used for the FPGA board remote access
+        self.remote = Connection(
+            host=self.remote_access_ip,
+            user=self.remote_access_username,
+            connect_kwargs=[['key_filename', str(self.remote_access_key)]])
+
 
     #---------------------------------------------------------------------------
     def print(self, msg):
@@ -74,116 +82,100 @@ class Automation(object):
 
 
     #---------------------------------------------------------------------------
-    def execute_ssh_command(self, cmd, name):
-        with open('{}/{}_out.txt'.format(self.log_dir, name), 'w') as fout:
-            with open('{}/{}_err.txt'.format(self.log_dir, name), 'w') as ferr:
-                # Even though the key authenticates us as root, it is a good
-                # idea to change the user to jenkins.
-                process = subprocess.Popen(
-                    "ssh -i {} {}@{} -f 'su jenkins && {}'".
-                        format(self.remote_access_key,
-                            self.remote_access_username,
-                            self.remote_access_ip,
-                            cmd),
-                            shell=True,
-                            stdout=fout,
-                            stderr=ferr)
-
-        return process
-
-
-    #---------------------------------------------------------------------------
     def power_on(self):
-        self.execute_ssh_command('{} {} on'.format(
+        self.remote.run('{} {} on'.format(
             self.remote_power_utility,
             self.board_id
-        ),
-        'power_on')
+        ), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def power_off(self):
-        self.execute_ssh_command('{} {} off'.format(
+        self.remote.run('{} {} off'.format(
             self.remote_power_utility,
             self.board_id
-        ),
-        'power_off')
+        ), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def reset(self):
-        self.execute_ssh_command('{} {} reset'.format(
+        self.remote.run('{} {} reset'.format(
             self.remote_power_utility,
             self.board_id
-        ),
-        'reset')
+        ), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def switch_sd_card_board(self):
-        self.execute_ssh_command('{} {} d'.format(
+        self.remote.run('{} {} d'.format(
             self.remote_sd_card_utility,
             self.board_id
-        ),
-        'sd_card_board')
+        ), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def switch_sd_card_host(self):
-        self.execute_ssh_command('{} {} s'.format(
+        self.remote.run('{} {} s'.format(
             self.remote_sd_card_utility,
             self.board_id
-        ),
-        'sd_card_host')
+        ), in_stream=False)
+
+
+    #---------------------------------------------------------------------------
+    def start_openocd_core(self, log):
+        # We run OpenOCD with disown=True since OpenOCD is active throughout the
+        # duration of the test run and waiting for its completion is not
+        # possible. Still, we need to verify that OpenOCD started correctly so
+        # the -l flag is used to store the output to a log file on the remote
+        # machine.
+        self.remote.run(
+            command = 'openocd -f {} -f {} -f {} -l {}'.format(
+                self.fpga_cfg,
+                self.sec_chip_cfg,
+                self.test_ctrl_cfg,
+                self.openocd_log_remote),
+                disown=True)
+
+        # Wait for OpenOCD to fully start
+        time.sleep(2)
+
+        # Copy the log file from the remote machine to the local workspace
+        try:
+            self.remote.get(
+                remote = self.openocd_log_remote,
+                local = log)
+        except:
+            print('Warning: No openocd log file found')
+            pass
 
 
     #---------------------------------------------------------------------------
     def start_openocd(self):
         cnt = 0
-        self.print('trying to start openocd')
-        openocd_proc = self.execute_ssh_command(
-                            'openocd -f {} -f {} -f {}'.format(
-                                self.fpga_cfg,
-                                self.sec_chip_cfg,
-                                self.test_ctrl_cfg
-                            ),
-                            'openocd')
-                        
-        time.sleep(1)
+        log_local = '{}/{}'.format(self.log_dir, Path(self.openocd_log_remote).name)
+        self.print('Trying to start openocd...')
+        self.start_openocd_core(log_local)
 
         # If openocd failed the first time, re-try for up to 3 more times, since
         # the most likely reason for the failure is that the board was not yet
         # ready.
-        while cnt < 3:
-            with open('{}/openocd_err.txt'.format(self.log_dir), 'r') as ferr:
-                log_data = ferr.read()
-                if not 'Info : Listening on port {} for gdb connections'.format(self.gdb_port) in log_data \
+        with open(log_local, 'r') as log_f:
+            while cnt < 3:
+                log_data = log_f.read()
+                if not 'Info : Listening on port {}'.format(self.gdb_port) in log_data \
                     or 'Error' in log_data:
                     self.print('Openocd failed! Retrying...')
 
                     # If openocd failed to launch the safest thing is to kill
                     # openocd, reset the board and try again
-                    openocd_proc.kill()
-                    self.execute_ssh_command('pkill -9 openocd', 'kill_openocd')
+                    self.remote.run('killall -q openocd', in_stream=False, warn=True)
                     self.reset()
-
                     time.sleep(30)
-
-                    openocd_proc = self.execute_ssh_command(
-                                        'openocd -f {} -f {} -f {}'.format(
-                                            self.fpga_cfg,
-                                            self.sec_chip_cfg,
-                                            self.test_ctrl_cfg
-                                        ),
-                                        'openocd')
-                    time.sleep(1)
-
+                    self.start_openocd_core(log_local)
                     cnt += 1
                 else:
                     self.print('Openocd started succesfully')
                     break
-
-        return openocd_proc
 
 
     #---------------------------------------------------------------------------
@@ -314,27 +306,20 @@ class Automation(object):
         # mode (-dmS) and start a picocom instance in it, since picocom requires
         # a live terminal. The picocom logs all captured data to the
         # "board_output_log" file which is later parsed by the test case.
-        return self.execute_ssh_command(
-                'screen -dmS {} bash && \
-                 screen -S {} -X stuff "picocom -b 115200 {} -g {}\n"'.format(
-                    self.screen_session,
-                    self.screen_session,
-                    self.uart_device_id, 
-                    self.board_output_log                         
-                ), 'serial')
+        self.remote.run(
+            'screen -dmS {} bash && \
+                screen -S {} -X stuff "picocom -b 115200 {} -g {}\n"'.format(
+                self.screen_session,
+                self.screen_session,
+                self.uart_device_id, 
+                self.board_output_log                         
+            ), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def extract_log(self):
         # Copy the log file from the remote test controller
-        subprocess.run(
-            "scp -i {} {}@{}:{} {}/log.txt".
-                format(self.remote_access_key,
-                        self.remote_access_username,
-                        self.remote_access_ip,
-                        self.board_output_log,
-                        self.log_dir),
-                        shell=True)
+        self.remote.get(remote=self.board_output_log, local='{}/log.txt'.format(self.log_dir))
 
         # Remove controll characters from the log file for the log parser to be
         # able to succesfully parse the test output (the raw log contains null
@@ -348,20 +333,20 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def cleanup(self):
-        # Kill used processes on the remote test controller, remove the log file
-        # and power off the board
-        self.execute_ssh_command('pkill -9 openocd', 'kill_openocd')
-        time.sleep(0.5)
-        self.execute_ssh_command('pkill -9 picocom', 'kill_serial_capture')
-        time.sleep(0.5)
-        self.execute_ssh_command('screen -S {} -X quit'.format(self.screen_session), 'kill_screen')
-        time.sleep(0.5)
-        self.execute_ssh_command('rm -f {}'.format(self.board_output_log), 'remove_log')
-        time.sleep(0.5)
-        self.power_off()
+        if hasattr(self, 'remote'):
+            # Kill used processes on the remote test controller, remove the log file
+            # and power off the board
+            self.remote.run('killall -q openocd', in_stream=False, warn=True)
+            self.remote.run('killall -q picocom', in_stream=False, warn=True)
+            self.remote.run('screen -S {} -X quit'.format(self.screen_session), in_stream=False, warn=True)
+            self.remote.run('rm -f {}'.format(self.board_output_log), in_stream=False, warn=True)
+            self.power_off()
+
+            # Close remote connection
+            self.remote.close()
 
         # Kill gdb on the host
-        subprocess.run("pkill -9 riscv64-unknown-linux-gnu-gdb", shell=True)
+        subprocess.run("killall -q riscv64-unknown-linux-gnu-gdb", shell=True)
 
 
 #===============================================================================
@@ -386,15 +371,15 @@ class BoardRunner(board_automation.System_Runner):
         self.board.reset()
 
         time.sleep(30)
-        self.process_serial_capture = self.board.start_serial_capture()
+        self.board.start_serial_capture()
 
         time.sleep(1)
-        self.process_openocd = self.board.start_openocd()
+        self.board.start_openocd()
 
         time.sleep(1)
         self.process_gdb = self.board.start_gdb(
-                        self.run_context.system_image,
-                        self.aditional_params)
+                            self.run_context.system_image,
+                            self.aditional_params)
 
         time.sleep(10)
         self.board.extract_log()
@@ -402,48 +387,32 @@ class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
     def send_data_to_uart(self, data):
-        self.board.execute_ssh_command('printf "{}" > {}'.format(
-            data, self.board.uart_device_id), 'send_to_uart')
+        self.board.remote.run('printf "{}" > {}'.format(data, self.board.uart_device_id), in_stream=False)
 
 
     #---------------------------------------------------------------------------
     def send_file_to_uart(self, file):
         # Copy the file to send to the remote
-        subprocess.run(
-            "scp -i {} {} {}@{}:bmrbl/{}".
-                format(self.board.remote_access_key,
-                        file,
-                        self.board.remote_access_username,
-                        self.board.remote_access_ip,
-                        os.path.basename(file)),
-                        shell=True)
+        self.board.remote.put(file, remote='bmrbl/')
 
         # Send the file using the sender utility on the remote
-        self.board.execute_ssh_command(
+        # in_stream=False is necessary to avoid 'OSError: reading from stdin
+        # while output is captured' caused by pytest
+        self.board.remote.run(
             'python3 bmrbl/srec_sender.py \
                 --srec-file bmrbl/{} \
                 --serial-port {}' \
             .format(
                 os.path.basename(file),
                 self.board.uart_device_id),
-            'send_file_to_uart')
-
-        # Wait until the sending is complete (max 60s)
-        with open('{}/send_file_to_uart_out.txt'.format(self.board.log_dir), 'r') as fout:
-            timeout = time.time() + 60
-            while(True):
-                time.sleep(1)
-                output = fout.read()
-                if 'Sending SREC data complete' in output or time.time() > timeout:
-                    break
+                in_stream=False,
+                hide=True)
 
         # Wait some time for the system to boot the loaded SREC file
         time.sleep(3)
 
         # Remove the file
-        self.board.execute_ssh_command(
-            'rm bmrbl/{}'.format(os.path.basename(file)),
-            'remove_file')
+        self.board.remote.run('rm -f bmrbl/{}'.format(os.path.basename(file)), in_stream=False)
 
 
     #---------------------------------------------------------------------------
@@ -454,9 +423,7 @@ class BoardRunner(board_automation.System_Runner):
     #---------------------------------------------------------------------------
     # interface board_automation.System_Runner
     def do_cleanup(self):
-        self.process_serial_capture.kill()
-        self.process_openocd.kill()
-        self.process_gdb.kill()
+        if hasattr(self, 'process_gdb'):
+            self.process_gdb.kill()
 
         self.board.cleanup()
-
