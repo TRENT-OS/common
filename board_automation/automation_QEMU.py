@@ -7,6 +7,7 @@ import selectors
 import os
 from enum import IntEnum
 import socket
+import time
 
 from . import tools
 from .tools import Timeout_Checker
@@ -324,6 +325,27 @@ class QemuProxyRunner(board_automation.System_Runner):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((self.qemu_uart_log_host, self.qemu_uart_log_port))
             s.sendall(str.encode(data))
+
+
+    #---------------------------------------------------------------------------
+    def send_file_to_uart(self, file):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.qemu_uart_log_host, self.qemu_uart_log_port))
+            with open(file, 'r') as srec:
+                while True:
+                    srec_line = srec.readline()
+                    if len(srec_line) == 0:
+                        break
+                    else:
+                        for byte in srec_line:
+                            s.send(bytes(byte, 'ascii'))
+                            # Empirically set delay between individual bytes
+                            # long enough to eliminate transmission errors
+                            time.sleep(0.01)
+
+                    # Empirically set delay between individual records
+                    # long enough to eliminate transmission errors
+                    time.sleep(0.15)
 
 
     #---------------------------------------------------------------------------
