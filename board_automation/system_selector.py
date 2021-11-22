@@ -61,7 +61,7 @@ def get_test_runner(
 
     if (platform in [
             'migv',
-            'hcsc1_fpga',
+            'migv',
             'zcu102']):
         return automation_zcu102.BoardRunner(
                         run_context,
