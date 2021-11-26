@@ -264,6 +264,16 @@ class TcpBridge():
 #===============================================================================
 import threading
 
+class QemuMachineCfg:
+    def __init__(self, constructor, param_list):
+        self.constructor = constructor
+        self.param_list = param_list
+
+    def create_qemu(self):
+        return self.constructor(*self.param_list)
+
+
+#-------------------------------------------------------------------------------
 class QemuProxyRunner(board_automation.System_Runner):
     # to allow multi instance of this class we need to avoid insisting on the
     # same port. Therefore a base is established here but the port number used
@@ -535,14 +545,27 @@ class QemuProxyRunner(board_automation.System_Runner):
                 super().__init__('/opt/xilinx-qemu/bin/qemu-system-aarch64',
                                     None, cpu, memory)
 
-                if res_path == None:
-                    raise Exception('ERROR: qemu_zcu102 requires the resource path')
+                if not os.path.isdir(res_path):
+                    raise Exception('Directory {} does not exist!'.format(res_path))
+
+                if not os.path.isdir(dev_path):
+                    raise Exception('Directory {} does not exist!'.format(dev_path))
+
+                dtb_f = os.path.join(res_path, 'zcu102-arm.dtb')
+                bl_elf = os.path.join(res_path, 'bl31.elf')
+                u_boot_elf = os.path.join(res_path, 'u-boot.elf')
+
+                if not os.path.isfile(dtb_f) or \
+                    not os.path.isfile(bl_elf) or \
+                    not os.path.isfile(u_boot_elf):
+                    raise Exception('The resource directory does not contain all \
+                                        necessary files to start QEMU')
 
                 self.add_params([
                     '-machine', 'arm-generic-fdt',
-                    '-dtb', os.path.join(res_path, 'zcu102-arm.dtb'),
-                    '-device', 'loader,file={},cpu-num=0'.format(os.path.join(res_path, 'bl31.elf')),
-                    '-device', 'loader,file={}'.format(os.path.join(res_path, 'u-boot.elf')),
+                    '-dtb', dtb_f,
+                    '-device', 'loader,file={},cpu-num=0'.format(bl_elf),
+                    '-device', 'loader,file={}'.format(u_boot_elf),
                     '-global', 'xlnx,zynqmp-boot.cpu-num=0',
                     '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
                     '-machine-path', dev_path])
@@ -567,20 +590,29 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert( not self.is_qemu_running() )
 
-        qemu = {
-            'sabre':    qemu_aarch32('sabrelite', None, 1024),
-            'migv':     qemu_riscv64('virt', None, 1024),
-            'hifive':   qemu_riscv64('sifive_u', None, 8192),
-            'rpi3':     qemu_aarch64('raspi3', None, 1024),
-            'spike64':  qemu_riscv64('spike', 'rv64', 4095),
-            'spike32':  qemu_riscv32('spike', 'rv32', 1024),
-            'zynq7000': qemu_aarch32('xilinx-zynq-a9', None, 1024),
-            'zynqmp':   qemu_zcu102(None, 4096,
-                                    os.path.join(
-                                        self.run_context.resource_dir,
-                                        'zcu102_sd_card'),
-                                    self.run_context.log_dir),
-        }.get(self.run_context.platform, None)
+        # Because some platforms require different parameters, it is better to
+        # avoid initializing all QEMU machine configurations on every test run.
+        # QemuMachineCfg is a wrapper class that contains a QEMU machine
+        # constructor function, a list of parameters and a function to only
+        # initialize a single QEMU configuration needed for the current test run.
+        qemu_cfgs = {
+            'sabre':    QemuMachineCfg(qemu_aarch32, ['sabrelite', None, 1024]),
+            'migv':     QemuMachineCfg(qemu_riscv64, ['virt', None, 1024]),
+            'hifive':   QemuMachineCfg(qemu_riscv64, ['sifive_u', None, 8192]),
+            'rpi3':     QemuMachineCfg(qemu_aarch64, ['raspi3', None, 1024]),
+            'spike64':  QemuMachineCfg(qemu_riscv64, ['spike', 'rv64', 4095]),
+            'spike32':  QemuMachineCfg(qemu_riscv32, ['spike', 'rv32', 1024]),
+            'zynq7000': QemuMachineCfg(qemu_aarch32, ['xilinx-zynq-a9', None, 1024]),
+            'zynqmp':   QemuMachineCfg(qemu_zcu102,
+                            [
+                                None, 4096,
+                                os.path.join(self.run_context.resource_dir, 'zcu102_sd_card'),
+                                self.run_context.log_dir
+                            ]),
+        }
+
+        selected_cfg = qemu_cfgs.get(self.run_context.platform, None)
+        qemu = selected_cfg.create_qemu()
 
         assert(qemu is not None)
 
