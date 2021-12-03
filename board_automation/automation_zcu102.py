@@ -145,7 +145,7 @@ class Automation(object):
                 remote = self.openocd_log_remote,
                 local = log)
         except:
-            print('Warning: No openocd log file found')
+            self.print('Warning: No openocd log file found')
             pass
 
 
@@ -159,23 +159,25 @@ class Automation(object):
         # If openocd failed the first time, re-try for up to 3 more times, since
         # the most likely reason for the failure is that the board was not yet
         # ready.
-        with open(log_local, 'r') as log_f:
-            while cnt < 3:
+        while cnt < 3:
+            self.print('Trying to start openocd...')
+            self.start_openocd_core(log_local)
+
+            with open(log_local, 'r') as log_f:
                 log_data = log_f.read()
                 if not 'Info : Listening on port {}'.format(self.gdb_port) in log_data \
                     or 'Error' in log_data:
                     self.print('Openocd failed! Retrying...')
-
-                    # If openocd failed to launch the safest thing is to kill
-                    # openocd, reset the board and try again
                     self.remote.run('killall -q openocd', in_stream=False, warn=True)
                     self.reset()
                     time.sleep(30)
-                    self.start_openocd_core(log_local)
                     cnt += 1
+                    continue
                 else:
                     self.print('Openocd started succesfully')
-                    break
+                    return 1
+        
+        return -1
 
 
     #---------------------------------------------------------------------------
@@ -193,30 +195,26 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def store_binary_to_flash_cmd(self, addres, binary):
+        bin_size = os.path.getsize(binary)
+        flash_size = self.flash_sec_size * self.flash_sec_num
+
+        if bin_size > flash_size:
+            raise Exception('Binary {} too large for flash: \
+                bin size = {}, flash size = {}!'.format(binary, bin_size, flash_size))
+
         cmd = ""
         # Flash write needs to be 32-bit aligned so it is necessary to pad
         # the image with 0 to the nearest 32-bit alignement
         self.pad_binary(binary)
-
         begin_sec_id = (addres - self.flash_start)//self.flash_sec_size
 
         # Erase enough sectors for the kernel binary
-        for sec in range(begin_sec_id,
-                            begin_sec_id +
-                            os.path.getsize(binary)//self.flash_sec_size + 1):
-
+        for sec in range(begin_sec_id, begin_sec_id + bin_size//self.flash_sec_size + 1):
             # Multiplying the sector id with 2^16 shifts it to the correct
             # position (starting from bit 16)
-            cmd += " -ex"
-            cmd += " 'set {{int}}{} = {}'".format(
-                                            self.flash_ctrl_reg,
-                                            sec * pow(2,16) + 1)
+            cmd += " -ex 'set {{int}}{} = {}'".format(self.flash_ctrl_reg, sec*pow(2,16)+1)
 
-        #-----------------------------------------------------------------------
-        cmd += " -ex"
-        cmd += " 'restore {} binary {}'".format(binary, addres)
-
-        return cmd
+        return (cmd + " -ex 'restore {} binary {}'".format(binary, addres))
 
 
     #---------------------------------------------------------------------------
@@ -226,13 +224,9 @@ class Automation(object):
         for idx, fuse in enumerate(otp_fuse_list, start=0):
             if otp_fuse_list[idx] == '1':
                 total_idx = idx + (self.otp_val_cnt * 32)
-                cmd += " -ex"
-                cmd += " 'set {{int}}{} = {}'".format(self.otp_idx_reg, total_idx)
-                cmd += " -ex"
-                cmd += " 'set {{int}}{} = {}'".format(
-                            self.otp_prog_reg,
-                            (~total_idx << self.otp_prog_idx_offset |
-                            self.otp_prog_cmd))
+                reg_val = ~total_idx << self.otp_prog_idx_offset | self.otp_prog_cmd
+                cmd += " -ex 'set {{int}}{} = {}'".format(self.otp_idx_reg, total_idx)
+                cmd += " -ex 'set {{int}}{} = {}'".format(self.otp_prog_reg, reg_val)
 
         self.otp_val_cnt += 1
         return cmd
@@ -247,8 +241,7 @@ class Automation(object):
     #---------------------------------------------------------------------------
     def create_gdb_cmd(self, system_img, params):
         gdb_cmd = "/opt/hc/riscv-toolchain/bin/riscv64-unknown-linux-gnu-gdb"
-        gdb_cmd += " -ex"
-        gdb_cmd += " 'target extended-remote {}:{}'".format(
+        gdb_cmd += " -ex 'target extended-remote {}:{}'".format(
                         self.remote_access_ip, self.gdb_port)
 
         if params:
@@ -273,14 +266,10 @@ class Automation(object):
                     self.print('ZCU102: additional parameter type {} \
                             not supported!'.format(param[2]))
 
-        gdb_cmd += " -ex"
-        gdb_cmd += " 'set {{int}}{} = 1'".format(self.rom_ctrl_reg)
-        gdb_cmd += " -ex"
-        gdb_cmd += " load {}".format(system_img)
-        gdb_cmd += " -ex"
-        gdb_cmd += " 'set {{int}}{} = 0'".format(self.rom_ctrl_reg)
-        gdb_cmd += " -ex"
-        gdb_cmd += " 'c'"
+        gdb_cmd += " -ex 'set {{int}}{} = 1'".format(self.rom_ctrl_reg)
+        gdb_cmd += " -ex load {}".format(system_img)
+        gdb_cmd += " -ex 'set {{int}}{} = 0'".format(self.rom_ctrl_reg)
+        gdb_cmd += " -ex 'c'"
 
         return gdb_cmd
 
@@ -308,9 +297,10 @@ class Automation(object):
         # "board_output_log" file which is later parsed by the test case.
         self.remote.run(
             'screen -dmS {} bash && \
-                screen -S {} -X stuff "picocom -b 115200 {} -g {}\n"'.format(
+                screen -S {} -X stuff "picocom -b {} {} -g {}\n"'.format(
                 self.screen_session,
                 self.screen_session,
+                self.uart_baud_rate,
                 self.uart_device_id, 
                 self.board_output_log                         
             ), in_stream=False)
@@ -374,7 +364,7 @@ class BoardRunner(board_automation.System_Runner):
         self.board.start_serial_capture()
 
         time.sleep(1)
-        self.board.start_openocd()
+        self.openocd_success = self.board.start_openocd()
 
         time.sleep(1)
         self.process_gdb = self.board.start_gdb(
