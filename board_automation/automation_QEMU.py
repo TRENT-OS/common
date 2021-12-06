@@ -433,7 +433,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self,
                 log_file_stdout,
                 log_file_stderr,
-                aditional_params = None,
+                additional_params = None,
                 printer = None,
                 print_log = False):
 
@@ -489,8 +489,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                             '-device', 'sd-card,drive=mycard'
                         ]
 
-                if aditional_params:
-                    for param in aditional_params:
+                if additional_params:
+                    for param in additional_params:
                         if param[2] == self.Additional_Param_Type.VALUE:
                             cmd_arr += self.param_mem_value(param[0], param[1])
                         elif param[2] == self.Additional_Param_Type.BINARY_IMG:
@@ -738,7 +738,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.process_qemu = qemu.start(
                                 log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
                                 log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
-                                aditional_params = self.additional_params,
+                                additional_params = self.additional_params,
                                 printer = self.run_context.printer,
                                 print_log = print_log
                             )
