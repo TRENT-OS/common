@@ -7,7 +7,6 @@ from enum import IntEnum
 from pathlib import Path
 from pytest_testconfig import config
 import pytest
-from fabric import Connection
 
 from . import board_automation
 
@@ -19,6 +18,7 @@ class Automation(object):
 
     #---------------------------------------------------------------------------
     def __init__(self, log_dir, printer):
+        from fabric import Connection
 
         # Get the variables from a platform-specific configuration file passed to
         # pytest-testconfig. In case the keys don't exist in the config file or the
