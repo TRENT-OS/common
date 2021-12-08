@@ -401,10 +401,10 @@ class QemuProxyRunner(board_automation.System_Runner):
 
             #-------------------------------------------------------------------
             def sys_log_setup(self, sys_log_path, host, port, id):
-                # In adition to outputting the guest system log to a log file,
-                # we are openning a 2-way TCP socket connected to the same
-                # serial device that allows the test suite to communicate with
-                # the guest during the test execution.
+                # In addition to outputting the guest system log to a log file,
+                # we are opening a 2-way TCP socket connected to the same serial
+                # device that allows the test suite to communicate with the
+                # guest during the test execution.
                 self.add_params([
                     '-chardev',
                     'socket,id=char{},port={},host={},server,nowait,logfile={},signal=off'.format(
