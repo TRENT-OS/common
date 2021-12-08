@@ -41,7 +41,8 @@ def get_test_runner(
             'zynq7000',
             'spike32',
             'spike64',
-            'hifive']):
+            'hifive',
+            'migv_qemu']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config,
@@ -60,7 +61,6 @@ def get_test_runner(
                             run_context.printer))
 
     if (platform in [
-            'migv',
             'migv',
             'zcu102']):
         return automation_zcu102.BoardRunner(

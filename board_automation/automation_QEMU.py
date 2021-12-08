@@ -472,7 +472,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     cmd_arr += ['-nic', 'tap,ifname={},script=no'.format(p)]
 
                 if self.sd_card_image:
-                    if (self.machine in ['spike', 'sifive_u']):
+                    if (self.machine in ['spike', 'sifive_u', 'mig-v']):
                         if printer:
                             printer.print(
                                 'QEMU: ignoring SD card, not supported for {}'.format(
@@ -555,6 +555,13 @@ class QemuProxyRunner(board_automation.System_Runner):
                 #     sifive-e51
                 #     sifive-u54
 
+
+        #-----------------------------------------------------------------------
+        class qemu_migv(qemu_app_wrapper):
+            def __init__(self, machine, cpu, memory):
+                super().__init__('/opt/hc/migv/bin/qemu-system-riscv64', machine, cpu, memory)
+
+
         #-----------------------------------------------------------------------
         class qemu_riscv32(qemu_app_wrapper):
             def __init__(self, machine, cpu, memory):
@@ -618,19 +625,19 @@ class QemuProxyRunner(board_automation.System_Runner):
         # constructor function, a list of parameters and a function to only
         # initialize a single QEMU configuration needed for the current test run.
         qemu_cfgs = {
-            'sabre':    QemuMachineCfg(qemu_aarch32, ['sabrelite', None, 1024]),
-            'migv':     QemuMachineCfg(qemu_riscv64, ['virt', None, 1024]),
-            'hifive':   QemuMachineCfg(qemu_riscv64, ['sifive_u', None, 8192]),
-            'rpi3':     QemuMachineCfg(qemu_aarch64, ['raspi3', None, 1024]),
-            'spike64':  QemuMachineCfg(qemu_riscv64, ['spike', 'rv64', 4095]),
-            'spike32':  QemuMachineCfg(qemu_riscv32, ['spike', 'rv32', 1024]),
-            'zynq7000': QemuMachineCfg(qemu_aarch32, ['xilinx-zynq-a9', None, 1024]),
-            'zynqmp':   QemuMachineCfg(qemu_zcu102,
-                            [
-                                None, 4096,
-                                os.path.join(self.run_context.resource_dir, 'zcu102_sd_card'),
-                                self.run_context.log_dir
-                            ]),
+            'sabre':        QemuMachineCfg(qemu_aarch32, ['sabrelite', None, 1024]),
+            'migv_qemu':    QemuMachineCfg(qemu_migv,    ['mig-v', None, 1024]),
+            'hifive':       QemuMachineCfg(qemu_riscv64, ['sifive_u', None, 8192]),
+            'rpi3':         QemuMachineCfg(qemu_aarch64, ['raspi3', None, 1024]),
+            'spike64':      QemuMachineCfg(qemu_riscv64, ['spike', 'rv64', 4095]),
+            'spike32':      QemuMachineCfg(qemu_riscv32, ['spike', 'rv32', 1024]),
+            'zynq7000':     QemuMachineCfg(qemu_aarch32, ['xilinx-zynq-a9', None, 1024]),
+            'zynqmp':       QemuMachineCfg(qemu_zcu102,
+                                [
+                                    None, 4096,
+                                    os.path.join(self.run_context.resource_dir, 'zcu102_sd_card'),
+                                    self.run_context.log_dir
+                                ]),
         }
 
         selected_cfg = qemu_cfgs.get(self.run_context.platform, None)
@@ -638,20 +645,20 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert(qemu is not None)
 
-        if self.run_context.platform in ['spike32', 'spike64']:
+        if self.run_context.platform in ['hifive', 'migv_qemu']:
+            qemu.bios = self.run_context.system_image
+        else:
             # Seems older QEMU versions do not support the 'bios' parameter, so
             # we can't use
             #   qemu.bios = self.run_context.system_image
             # and have to stick to loading a kernel
             qemu.kernel = self.run_context.system_image
-        elif self.run_context.platform in ['hifive']:
-            qemu.bios = self.run_context.system_image
-            # The platform has 1x E51 and 4x U54. In QEMU, the E51 and one U54
-            # always exist, setting qemu.cores = 3,4,5 can be used to activate
-            # additional U54 cores.
-            # qemu.cores = 5
-        else:
-            qemu.kernel = self.run_context.system_image
+
+        # if self.run_context.platform in ['hifive']:
+        #     # The platform has 1x E51 and 4x U54. In QEMU, the E51 and one U54
+        #     # always exist, setting qemu.cores = 3,4,5 can be used to activate
+        #     # additional U54 cores.
+        #     qemu.cores = 5
 
         #qemu.singlestep = True
         #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
