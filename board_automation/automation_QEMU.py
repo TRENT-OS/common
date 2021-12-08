@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import sys
+import threading
 import traceback
 import socket
 import selectors
@@ -263,7 +264,6 @@ class TcpBridge():
 
 #===============================================================================
 #===============================================================================
-import threading
 
 class QemuMachineCfg:
     def __init__(self, constructor, param_list):
