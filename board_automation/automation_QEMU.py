@@ -405,11 +405,12 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # we are opening a 2-way TCP socket connected to the same serial
                 # device that allows the test suite to communicate with the
                 # guest during the test execution.
+                dev_id = 'char{}'.format(id)
                 self.add_params([
                     '-chardev',
-                    'socket,id=char{},port={},host={},server,nowait,logfile={},signal=off'.format(
-                        id, port, host, sys_log_path)])
-                self.serial_ports += ['chardev:char{}'.format(id)]
+                    'socket,id={},port={},host={},server,nowait,logfile={},signal=off'.format(
+                        dev_id, port, host, sys_log_path)])
+                self.serial_ports += ['chardev:{}'.format(dev_id)]
 
 
             #-------------------------------------------------------------------------------
@@ -483,10 +484,11 @@ class QemuProxyRunner(board_automation.System_Runner):
                             #       modify the original file...
                             with open(self.sd_card_image, 'wb') as sd_card_image:
                                 sd_card_image.truncate(self.sd_card_size)
+                        dev_id = 'mycard'
                         cmd_arr += [
                             '-drive',
-                            'file={},format=raw,id=mycard'.format(self.sd_card_image),
-                            '-device', 'sd-card,drive=mycard'
+                            'file={},format=raw,id={}'.format(self.sd_card_image, dev_id),
+                            '-device', 'sd-card,drive={}'.format(dev_id)
                         ]
 
                 if additional_params:
