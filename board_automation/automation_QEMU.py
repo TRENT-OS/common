@@ -390,6 +390,12 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 self.params = [] # additional parameters
 
+            #-------------------------------------------------------------------------------
+            def add_serial_port(self, port):
+                # A list preserves the order of added element
+                self.serial_ports += [port]
+
+
             #-------------------------------------------------------------------
             def add_params(self, *argv):
                 for arg in argv:
@@ -410,7 +416,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     '-chardev',
                     'socket,id={},port={},host={},server,nowait,logfile={},signal=off'.format(
                         dev_id, port, host, sys_log_path)])
-                self.serial_ports += ['chardev:{}'.format(dev_id)]
+                self.add_serial_port('chardev:{}'.format(dev_id))
 
 
             #-------------------------------------------------------------------------------
@@ -689,11 +695,11 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         if (has_data_uart):
             # UART 0 or UART 1 is used for data
-            qemu.serial_ports += ['tcp:localhost:{},server'.format(self.qemu_uart_network_port)]
+            qemu.add_serial_port('tcp:localhost:{},server'.format(self.qemu_uart_network_port))
         elif has_syslog_on_uart_1:
             # UART 0 must be a dummy in this case
             assert(0 == len(qemu.serial_ports))
-            qemu.serial_ports += ['null']
+            qemu.add_serial_port('null')
 
         if has_syslog_on_uart_1:
             assert(1 == len(qemu.serial_ports))
