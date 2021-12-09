@@ -396,6 +396,80 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.serial_ports += [port]
 
 
+            #-------------------------------------------------------------------------------
+            def serialize_param_dict(self, arg_dict):
+                # Python 3.6 made the standard dict type maintain the insertion
+                # order. With older versions the iteration order is random.
+                return ','.join([
+                            ('{}'.format(key) if value is None \
+                                else '{}={}'.format(key, value))
+                            for (key, value) in arg_dict.items()
+                       ])
+
+
+            #-------------------------------------------------------------------------------
+            def add_drive(self, param_dict):
+                self.params += [
+                    '-drive',
+                    self.serialize_param_dict(param_dict)
+                ]
+
+
+            #-------------------------------------------------------------------------------
+            def add_device(self, dev_param, dev_type, param_dict = dict()):
+                self.params += [
+                    dev_param,
+                    ','.join([
+                        dev_type,
+                        self.serialize_param_dict(param_dict)
+                    ])
+                ]
+
+            #-------------------------------------------------------------------------------
+            def add_loader_device(self, param_dict):
+
+                assert(len(param_dict) > 0)  # there must be loader parameters
+                self.add_device('-device', 'loader', param_dict)
+
+
+            #-------------------------------------------------------------------------------
+            def init_memory_at(self, address, value, param_dict = dict()):
+                full_param_dict = {
+                    'addr': address,
+                    'data': value,
+                    'data-len': 4
+                }
+                full_param_dict.update(param_dict)
+                self.add_loader_device(full_param_dict)
+
+
+            #-------------------------------------------------------------------------------
+            def load_blob(self, address, filename, param_dict = dict()):
+
+                if not os.path.isfile(filename):
+                    raise Exception('Missing blob file: {}'.format(filename))
+
+                full_param_dict = {
+                    'addr': address,
+                    'file': filename
+                }
+                full_param_dict.update(param_dict)
+                self.add_loader_device(full_param_dict)
+
+
+            #-------------------------------------------------------------------------------
+            def load_elf(self, filename, param_dict = dict()):
+
+                if not os.path.isfile(filename):
+                    raise Exception('Missing ELF file: {}'.format(filename))
+
+                full_param_dict = {
+                    'file': filename
+                }
+                full_param_dict.update(param_dict)
+                self.add_loader_device(full_param_dict)
+
+
             #-------------------------------------------------------------------
             def add_params(self, *argv):
                 for arg in argv:
@@ -412,10 +486,15 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # device that allows the test suite to communicate with the
                 # guest during the test execution.
                 dev_id = 'char{}'.format(id)
-                self.add_params([
-                    '-chardev',
-                    'socket,id={},port={},host={},server,nowait,logfile={},signal=off'.format(
-                        dev_id, port, host, sys_log_path)])
+                self.add_device('-chardev', 'socket', {
+                    'id': dev_id,
+                    'port': port,
+                    'host': host,
+                    'server': None,
+                    'nowait': None,
+                    'logfile': sys_log_path,
+                    'signal': 'off'
+                })
                 self.add_serial_port('chardev:{}'.format(dev_id))
 
 
@@ -423,16 +502,6 @@ class QemuProxyRunner(board_automation.System_Runner):
             class Additional_Param_Type(IntEnum):
                 VALUE       = 0,
                 BINARY_IMG  = 1,
-
-
-            #-------------------------------------------------------------------------------
-            def param_mem_blob(self, address, blob):
-                return ['-device', 'loader,addr={},file={},'.format(address, blob)]
-
-
-            #-------------------------------------------------------------------------------
-            def param_mem_value(self, address, value):
-                return ['-device', 'loader,addr={},data={},data-len=4'.format(address, value)]
 
 
             #-------------------------------------------------------------------
@@ -475,8 +544,11 @@ class QemuProxyRunner(board_automation.System_Runner):
                     cmd_arr += ['-serial', p if p else 'null']
 
                 # connect all NICs to existing TAPx devices
-                for p in self.nics:
-                    cmd_arr += ['-nic', 'tap,ifname={},script=no'.format(p)]
+                for tap_nic in self.nics:
+                    self.add_device('-nic', 'tap', {
+                        'ifname': tap_nic,
+                        'script': 'no'
+                    })
 
                 if self.sd_card_image:
                     if (self.machine in ['spike', 'sifive_u', 'mig-v']):
@@ -491,18 +563,19 @@ class QemuProxyRunner(board_automation.System_Runner):
                             with open(self.sd_card_image, 'wb') as sd_card_image:
                                 sd_card_image.truncate(self.sd_card_size)
                         dev_id = 'mycard'
-                        cmd_arr += [
-                            '-drive',
-                            'file={},format=raw,id={}'.format(self.sd_card_image, dev_id),
-                            '-device', 'sd-card,drive={}'.format(dev_id)
-                        ]
+                        self.add_drive({
+                            'file': self.sd_card_image,
+                            'format': 'raw',
+                            'id': dev_id,
+                        })
+                        self.add_device('-device', 'sd-card', {'drive': dev_id})
 
                 if additional_params:
                     for param in additional_params:
                         if param[2] == self.Additional_Param_Type.VALUE:
-                            cmd_arr += self.param_mem_value(param[0], param[1])
+                            self.init_memory_at(param[0], param[1])
                         elif param[2] == self.Additional_Param_Type.BINARY_IMG:
-                            cmd_arr += self.param_mem_blob(param[0], param[1])
+                            self.load_blob(param[0], param[1])
                         else:
                             printer.print('QEMU: additional parameter type {} \
                                 not supported!'.format(param[2]))
@@ -583,10 +656,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                                     None, cpu, memory)
 
                 if not os.path.isdir(res_path):
-                    raise Exception('Directory {} does not exist!'.format(res_path))
+                    raise Exception('res_path Directory {} does not exist!'.format(res_path))
 
                 if not os.path.isdir(dev_path):
-                    raise Exception('Directory {} does not exist!'.format(dev_path))
+                    raise Exception('dev_path Directory {} does not exist!'.format(dev_path))
 
                 dtb_f = os.path.join(res_path, 'zcu102-arm.dtb')
                 bl_elf = os.path.join(res_path, 'bl31.elf')
@@ -598,11 +671,12 @@ class QemuProxyRunner(board_automation.System_Runner):
                     raise Exception('The resource directory does not contain all \
                                         necessary files to start QEMU')
 
+                self.load_elf(bl_elf, {'cpu-num': 0})
+                self.load_elf(u_boot_elf)
+
                 self.add_params([
                     '-machine', 'arm-generic-fdt',
                     '-dtb', dtb_f,
-                    '-device', 'loader,file={},cpu-num=0'.format(bl_elf),
-                    '-device', 'loader,file={}'.format(u_boot_elf),
                     '-global', 'xlnx,zynqmp-boot.cpu-num=0',
                     '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
                     '-machine-path', dev_path])
@@ -617,11 +691,12 @@ class QemuProxyRunner(board_automation.System_Runner):
                 if res_path == None:
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
 
+                self.load_elf(os.path.join(res_path, 'pmufw.elf'))
+
                 self.add_params([
                     '-machine', 'microblaze-fdt',
                     '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
                     '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
-                    '-device', 'loader,file={}'.format(os.path.join(res_path, 'pmufw.elf')),
                     '-machine-path', dev_path])
 
 
