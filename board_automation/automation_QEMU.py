@@ -707,6 +707,11 @@ class QemuProxyRunner(board_automation.System_Runner):
             qemu.sd_card_image = self.get_log_file_fqn('sdcard1.img')
             qemu.sd_card_size = self.sd_card_size
 
+        # QEMU sabre uses tap2 for the native networking support (not using
+        # the proxy)
+        if self.run_context.platform == 'sabre':
+            qemu.nics += ['tap2']
+
         # Running test on the zynqmp requires 2 QEMU instances and passing
         # additional parameters.
         if self.run_context.platform == 'zynqmp':
