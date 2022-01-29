@@ -731,6 +731,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             'qemu-arm-virt-a15':  QemuMachineCfg(qemu_aarch32, ['virt', 'cortex-a15', 2048]),
             'qemu-arm-virt-a53':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a53', 2048]),
             'qemu-arm-virt-a57':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a57', 2048]),
+            'qemu-arm-virt-a72':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a72', 2048]),
         }
 
         selected_cfg = qemu_cfgs.get(self.run_context.platform, None)

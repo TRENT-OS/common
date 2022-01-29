@@ -51,7 +51,8 @@ def get_test_runner(
             'migv_qemu',
             'qemu-arm-virt-a15',
             'qemu-arm-virt-a53',
-            'qemu-arm-virt-a57']):
+            'qemu-arm-virt-a57',
+            'qemu-arm-virt-a72']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config,
