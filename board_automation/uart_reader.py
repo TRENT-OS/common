@@ -44,7 +44,7 @@ class TTY_USB():
             # each item in the folder is a symlink
             linked_dev = os.path.realpath(dev_fqn)
             # 1-4.2.2.1:1.0 -> 1-4.2.2.1
-            usb_path = pathlib.Path(linked_dev).parts[-4].split(':',1)[0]
+            usb_path = pathlib.Path(linked_dev).parts[-4] #.split(':',1)[0]
 
             usb_dev = os.path.join('/sys/bus/usb/devices', usb_path)
 
