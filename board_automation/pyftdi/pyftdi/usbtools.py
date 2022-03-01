@@ -572,7 +572,10 @@ class UsbTools:
                 cls.UsbApi = 2
         try:
             if cls.UsbApi == 2:
-                return usb_get_string(device, stridx)
+                try:
+                    return usb_get_string(device, stridx)
+                except ValueError:
+                    return '(none)'
             return usb_get_string(device, 64, stridx)
         except UnicodeDecodeError:
             # do not abort if EEPROM data is somewhat incoherent
