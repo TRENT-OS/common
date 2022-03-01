@@ -4,6 +4,7 @@ from . import tools
 from . import board_automation
 from . import automation_QEMU
 from . import automation_SabreLite
+from . import automation_Nitrogen6sx
 from . import automation_RasPi
 from . import automation_zcu102
 from . import automation_OdroidC2
@@ -41,6 +42,9 @@ def get_test_runner(run_context):
         ],
         automation_SabreLite: [
             'sabre-hw',
+        ],
+        automation_Nitrogen6sx: [        
+            'nitrogen6sx',
         ],
         automation_RasPi: [
             'rpi3',
