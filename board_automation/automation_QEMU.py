@@ -681,12 +681,12 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.load_elf(bl_elf, {'cpu-num': 0})
                 self.load_elf(u_boot_elf)
 
-                self.add_params([
+                self.add_params(
                     '-machine', 'arm-generic-fdt',
                     '-dtb', dtb_f,
                     '-global', 'xlnx,zynqmp-boot.cpu-num=0',
                     '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
-                    '-machine-path', dev_path])
+                    '-machine-path', dev_path)
 
 
         #-----------------------------------------------------------------------
@@ -700,11 +700,11 @@ class QemuProxyRunner(board_automation.System_Runner):
 
                 self.load_elf(os.path.join(res_path, 'pmufw.elf'))
 
-                self.add_params([
+                self.add_params(
                     '-machine', 'microblaze-fdt',
                     '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
                     '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
-                    '-machine-path', dev_path])
+                    '-machine-path', dev_path)
 
 
         assert( not self.is_qemu_running() )
