@@ -622,24 +622,17 @@ class QemuProxyRunner(board_automation.System_Runner):
         class qemu_riscv64(qemu_app_wrapper):
             def __init__(self, machine, cpu, memory):
                 super().__init__('qemu-system-riscv64', machine, cpu, memory)
-                # qemu-system-riscv64
-                #   -machine <'list' or one from the list>
-                #     none          empty machine
-                #     sifive_e      SiFive E SDK
-                #     sifive_u      SiFive U SDK
-                #     spike         (default)
-                #     spike_v1.10   (Privileged ISA v1.10)
-                #     spike_v1.9.1  (Privileged ISA v1.9.1)
-                #     virt          VirtIO board
-                #
-                #     dump the device tree with "<machine>,dumpdtb=dtb.out"
-                #
-                #   -cpu <'help' or one form the list>
+                #     microchip-icicle-kit  Microchip PolarFire
+                #     none                  empty machine
+                #     sifive_e              SiFive E SDK
+                #     sifive_u              SiFive U SDK (1x E51, up to 4x U54)
+                #     spike                 (default)
+                #     virt                  VirtIO board (rv32gc/rv64gc)
+                #   dump the device tree with "<machine>,dumpdtb=dtb.out"
+                # -cpu <'help' or one form the list>
+                # -machine <'help' or one form the list>:
                 #     any
                 #     rv64
-                #     rv64gcsu-v1.10.0
-                #     rv64gcsu-v1.9.1
-                #     rv64imacu-nommu
                 #     sifive-e51
                 #     sifive-u54
 
