@@ -395,6 +395,14 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # A list preserves the order of added element
                 self.serial_ports += [port]
 
+            #-------------------------------------------------------------------
+            def add_params(self, *argv):
+                for arg in argv:
+                    if isinstance(arg, list):
+                        self.params.extend(arg)
+                    else:
+                        self.params.append(arg)
+
 
             #-------------------------------------------------------------------------------
             def serialize_param_dict(self, arg_dict):
@@ -409,21 +417,21 @@ class QemuProxyRunner(board_automation.System_Runner):
 
             #-------------------------------------------------------------------------------
             def add_drive(self, param_dict):
-                self.params += [
+                self.add_params(
                     '-drive',
                     self.serialize_param_dict(param_dict)
-                ]
+                )
 
 
             #-------------------------------------------------------------------------------
             def add_device(self, dev_param, dev_type, param_dict = dict()):
-                self.params += [
+                self.add_params(
                     dev_param,
                     ','.join([
                         dev_type,
                         self.serialize_param_dict(param_dict)
                     ])
-                ]
+                )
 
             #-------------------------------------------------------------------------------
             def add_loader_device(self, param_dict):
@@ -468,16 +476,6 @@ class QemuProxyRunner(board_automation.System_Runner):
                 }
                 full_param_dict.update(param_dict)
                 self.add_loader_device(full_param_dict)
-
-
-            #-------------------------------------------------------------------
-            def add_params(self, *argv):
-                for arg in argv:
-                    if isinstance(arg, list):
-                        self.params.extend(arg)
-                    else:
-                        self.params.append(arg)
-
 
             #-------------------------------------------------------------------
             def sys_log_setup(self, sys_log_path, host, port, id):
