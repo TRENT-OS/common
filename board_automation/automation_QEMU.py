@@ -488,8 +488,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                 dev_id = 'char{}'.format(id)
                 self.add_device('-chardev', 'socket', {
                     'id': dev_id,
-                    'port': port,
                     'host': host,
+                    'port': port,
                     'server': None,
                     'nowait': None,
                     'logfile': sys_log_path,
