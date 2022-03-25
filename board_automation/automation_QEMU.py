@@ -485,7 +485,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # we are opening a 2-way TCP socket connected to the same serial
                 # device that allows the test suite to communicate with the
                 # guest during the test execution.
-                dev_id = 'char{}'.format(id)
+                dev_id = 'chardev{}'.format(id)
                 self.add_device('-chardev', 'socket', {
                     'id': dev_id,
                     'host': host,
@@ -569,7 +569,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                             #       modify the original file...
                             with open(self.sd_card_image, 'wb') as sd_card_image:
                                 sd_card_image.truncate(self.sd_card_size)
-                        dev_id = 'mycard'
+                        dev_id = 'sdcardimg'
                         self.add_drive({
                             'file': self.sd_card_image,
                             'format': 'raw',
