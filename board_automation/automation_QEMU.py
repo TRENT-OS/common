@@ -376,24 +376,17 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # enable for instruction tracing
                 self.singlestep = False
 
-                # SD card
-                self.sd_card_image = None
-                self.sd_card_size = None # set to truncate sd_card_image
-
-                # There can be multiple serial ports. Python guarantees the
-                # order is preserved when adding elements to an array.
+                # There can be multiple drives, devices, serial ports and NICs.
+                # Python guarantees the order is preserved when adding elements
+                # to an array.
+                self.drives = []
+                self.devices = []
                 self.serial_ports = []
+                # SD card devices based on images need unique numbers.
+                self.num_sdcard_images = 0
 
-                # There can be multiple NICs. Python guarantees the order is
-                # preserved when adding elements to an array.
-                self.nics = []
-
-                self.params = [] # additional parameters
-
-            #-------------------------------------------------------------------------------
-            def add_serial_port(self, port):
-                # A list preserves the order of added element
-                self.serial_ports += [port]
+                # additional parameters passed to QEMU
+                self.params = []
 
             #-------------------------------------------------------------------
             def add_params(self, *argv):
@@ -408,7 +401,8 @@ class QemuProxyRunner(board_automation.System_Runner):
             def serialize_param_dict(self, arg_dict):
                 # Python 3.6 made the standard dict type maintain the insertion
                 # order. With older versions the iteration order is random.
-                return ','.join([
+                return None if arg_dict is None \
+                       else ','.join([
                             ('{}'.format(key) if value is None \
                                 else '{}={}'.format(key, value))
                             for (key, value) in arg_dict.items()
@@ -416,28 +410,63 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
             #-------------------------------------------------------------------------------
+            def add_serial_port(self, port):
+                # A list preserves the order of added element
+                self.serial_ports += [port]
+
+
+            #-------------------------------------------------------------------------------
             def add_drive(self, param_dict):
-                self.add_params(
-                    '-drive',
-                    self.serialize_param_dict(param_dict)
-                )
+                self.drives += [param_dict]
 
 
             #-------------------------------------------------------------------------------
-            def add_device(self, dev_param, dev_type, param_dict = dict()):
-                self.add_params(
-                    dev_param,
-                    ','.join([
-                        dev_type,
-                        self.serialize_param_dict(param_dict)
-                    ])
-                )
+            def add_device(self, dev_type, sub_type, param_dict = None):
+                self.devices += [ (dev_type, sub_type, param_dict) ]
+
 
             #-------------------------------------------------------------------------------
-            def add_loader_device(self, param_dict):
+            def add_dev_nic_none(self):
+                # Any dummy NIC is just another device
+                self.add_device('nic', 'none', None)
 
+
+            #-------------------------------------------------------------------------------
+            def add_dev_nic_tap(self, tap, param_dict = dict()):
+                full_param_dict = {
+                    'ifname': tap,
+                    'script': 'no'
+                }
+                full_param_dict.update(param_dict)
+                # Any TAP NIC is just another device
+                self.add_device('nic', 'tap', full_param_dict)
+
+
+            #-------------------------------------------------------------------------------
+            def add_dev_char_socket(self, param_dict):
+                assert(len(param_dict) > 0)  # there must be parameters
+                # Any chardevice based on a socket is basically just another
+                # device
+                self.add_device('chardev', 'socket', param_dict)
+
+
+            #-------------------------------------------------------------------------------
+            def add_sdcard_from_image(self, sd_card_image):
+                dev_id = 'sdcardimg{}'.format(self.num_sdcard_images)
+                self.num_sdcard_images += 1
+                # Add a drive with the file and connect the SD-Card to it.
+                self.add_drive({
+                    'id': dev_id,
+                    'file': sd_card_image,
+                    'format': 'raw',
+                })
+                self.add_device('device', 'sd-card', {'drive': dev_id})
+
+
+            #-------------------------------------------------------------------------------
+            def add_dev_loader(self, param_dict):
                 assert(len(param_dict) > 0)  # there must be loader parameters
-                self.add_device('-device', 'loader', param_dict)
+                self.add_device('device', 'loader', param_dict)
 
 
             #-------------------------------------------------------------------------------
@@ -448,7 +477,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     'data-len': 4
                 }
                 full_param_dict.update(param_dict)
-                self.add_loader_device(full_param_dict)
+                self.add_dev_loader(full_param_dict)
 
 
             #-------------------------------------------------------------------------------
@@ -462,7 +491,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     'file': filename
                 }
                 full_param_dict.update(param_dict)
-                self.add_loader_device(full_param_dict)
+                self.add_dev_loader(full_param_dict)
 
 
             #-------------------------------------------------------------------------------
@@ -475,7 +504,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     'file': filename
                 }
                 full_param_dict.update(param_dict)
-                self.add_loader_device(full_param_dict)
+                self.add_dev_loader(full_param_dict)
 
             #-------------------------------------------------------------------
             def sys_log_setup(self, sys_log_path, host, port, id):
@@ -484,7 +513,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # device that allows the test suite to communicate with the
                 # guest during the test execution.
                 dev_id = 'chardev{}'.format(id)
-                self.add_device('-chardev', 'socket', {
+                self.add_dev_char_socket({
                     'id': dev_id,
                     'host': host,
                     'port': port,
@@ -537,43 +566,25 @@ class QemuProxyRunner(board_automation.System_Runner):
                 if self.bios:
                     cmd_arr += ['-bios', self.bios]
 
-                # connect all serial ports
+                for param_dict in self.drives:
+                    assert(len(param_dict) > 0)  # there must be parameters
+                    cmd_arr += ['-drive', self.serialize_param_dict(param_dict)]
+
+                # NICs and CharDevs are also just devices, because the parameter
+                # format is the same.
+                for (dev_type, sub_type, param_dict) in self.devices:
+                    cmd_arr += [
+                        '-' + dev_type,
+                        sub_type if param_dict is None \
+                        else ','.join([
+                            sub_type,
+                            self.serialize_param_dict(param_dict)
+                        ])
+                    ]
+
+                # Serial ports might be connected to devices from above.
                 for p in self.serial_ports:
                     cmd_arr += ['-serial', p if p else 'null']
-
-                # Avoid an error message on the ARM virt platform that the
-                # device "virtio-net-pci" init fails due to missing ROM file
-                # "efi-virtio.rom".
-                if 'virt' == self.machine:
-                    # ToDo: check virt platform of other architectures
-                    assert(self.cpu.startswith('cortex-a'))
-                    cmd_arr += ['-nic', 'none']
-                else:
-                    for tap_nic in self.nics:
-                        self.add_device('-nic', 'tap', {
-                            'ifname': tap_nic,
-                            'script': 'no'
-                        })
-
-                if self.sd_card_image:
-                    if (self.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
-                        if printer:
-                            printer.print(
-                                'QEMU: ignoring SD card, not supported for {}'.format(
-                                    self.machine))
-                    else:
-                        if self.sd_card_size:
-                            # ToDo: maybe we should create a copy here and not
-                            #       modify the original file...
-                            with open(self.sd_card_image, 'wb') as sd_card_image:
-                                sd_card_image.truncate(self.sd_card_size)
-                        dev_id = 'sdcardimg'
-                        self.add_drive({
-                            'file': self.sd_card_image,
-                            'format': 'raw',
-                            'id': dev_id,
-                        })
-                        self.add_device('-device', 'sd-card', {'drive': dev_id})
 
                 if additional_params:
                     for param in additional_params:
@@ -787,31 +798,33 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.qemu_uart_log_port,
                 1)
 
-        # SD card (might be ignored if target does not support this)
-        if self.sd_card_size and (self.sd_card_size > 0):
-            qemu.sd_card_image = self.get_log_file_fqn('sdcard1.img')
-            qemu.sd_card_size = self.sd_card_size
-
-        # QEMU sabre uses tap2 for the native networking support (not using
-        # the proxy)
         if self.run_context.platform == 'sabre':
-            qemu.nics += ['tap2']
+            # QEMU sabre uses tap2 for the native networking support (not using
+            # the proxy)
+            qemu.add_dev_nic_tap('tap2')
+
+        elif qemu.machine == 'virt':
+            # Avoid an error message on the ARM virt platform that the
+            # device "virtio-net-pci" init fails due to missing ROM file
+            # "efi-virtio.rom".
+            # ToDo: check virt platform of other architectures
+            assert(qemu.cpu.startswith('cortex-a'))
+            qemu.add_dev_nic_none()
 
         # Running test on the zynqmp requires 2 QEMU instances and passing
-        # additional parameters.
+        # additional parameters, we create an SD card with the OS image
         if self.run_context.platform == 'zynqmp':
             # Since we are booting from the SD card the kernel image is not
             # passed directly
             qemu.kernel = None
 
-            # We do not want to truncate the SD card to a specific size
-            qemu.sd_card_size = None
-
-            # Creating an SD image that contains the system binary which will
+            # Create an SD image that contains the system binary, which will
             # be booted by U-Boot
-            tools.create_sd_img(qemu.sd_card_image,
+            sd_card_image = self.get_log_file_fqn('sdcard1.img')
+            tools.create_sd_img(sd_card_image,
                                 128*1024*1024, # 128 MB
                                 [(self.run_context.system_image, 'os_image.elf')])
+            qemu.add_sdcard_from_image(sd_card_image)
 
             # Initializing the MicroBlaze based PMU QEMU instance
             qemu_pmu_instance = qemu_microblaze(None, None,
@@ -827,6 +840,20 @@ class QemuProxyRunner(board_automation.System_Runner):
                         printer = self.run_context.printer,
                         print_log = print_log
                     )
+        elif self.sd_card_size and (self.sd_card_size > 0):
+            # SD card (might be ignored if target does not support this)
+            if (qemu.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
+                if self.run_context.printer:
+                    self.run_context.printer.print(
+                        'QEMU: ignoring SD card image, not supported for {}'.format(
+                            qemu.machine))
+            else:
+                sd_card_image = self.get_log_file_fqn('sdcard1.img')
+                # ToDo: maybe we should create a copy here and not
+                #       modify the original file...
+                with open(sd_card_image, 'wb') as f:
+                    f.truncate(self.sd_card_size)
+                qemu.add_sdcard_from_image(sd_card_image)
 
         # start QEMU
         self.process_qemu = qemu.start(
