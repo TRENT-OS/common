@@ -704,11 +704,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
 
                 self.dtb = os.path.join(res_path, 'zynqmp-pmu.dtb')
+                self.kernel = os.path.join(res_path, 'pmu_rom_qemu_sha3.elf')
                 self.load_elf(os.path.join(res_path, 'pmufw.elf'))
 
-                self.add_params(
-                    '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
-                    '-machine-path', dev_path)
+                self.add_params('-machine-path', dev_path)
 
 
         assert( not self.is_qemu_running() )
