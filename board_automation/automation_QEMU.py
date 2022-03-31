@@ -700,7 +700,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 super().__init__('/opt/xilinx-qemu/bin/qemu-system-microblazeel',
                                  'microblaze-fdt', cpu, memory)
 
-                if res_path == None:
+                if res_path is None:
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
 
                 self.dtb = os.path.join(res_path, 'zynqmp-pmu.dtb')
