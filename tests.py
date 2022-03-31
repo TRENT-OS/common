@@ -12,11 +12,10 @@ def run_test_log_match_sequence(fixture, test_system, expr_array, timeout_sec=0)
     #       time against the actual test. Also, if the boot fails, we can abort
     #       the test early already and do not wait the full test specific
     #       timeout.
-    test_run = fixture(test_system)
-    f_out = test_run[1]
+    test_runner = fixture(test_system)
 
     (ret, text, expr_fail) = logs.check_log_match_sequence(
-                                f_out,
+                                test_runner.get_system_log(),
                                 expr_array,
                                 timeout_sec)
 
@@ -36,11 +35,10 @@ def run_test_log_match_set(fixture, test_system, expr_array, timeout_sec=0):
     #       time against the actual test. Also, if the boot fails, we can abort
     #       the test early already and do not wait the full test specific
     #       timeout.
-    test_run = fixture(test_system)
-    f_out = test_run[1]
+    test_runner = fixture(test_system)
 
     (ret, text, expr_fail) = logs.check_log_match_set(
-                                f_out,
+                                test_runner.get_system_log(),
                                 expr_array,
                                 timeout_sec)
     if not ret:

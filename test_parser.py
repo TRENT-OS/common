@@ -13,7 +13,7 @@ def fail_on_assert(f_out):
 
 
 #-------------------------------------------------------------------------------
-def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True, occurrences=1):
+def check_test(test_runner, timeout, test_fn, test_args=None, single_thread=True, occurrences=1):
     """
     The strategy to check the test results for cases where there is only a
     single test thread (single_thread=True) is as follows:
@@ -39,7 +39,7 @@ def check_test(test_run, timeout, test_fn, test_args=None, single_thread=True, o
 
     __tracebackhide__ = True
 
-    f_out = test_run[1]
+    f_out = test_runner.get_system_log()
     iterations = occurrences
 
     while iterations > 0:
