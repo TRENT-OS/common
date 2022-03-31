@@ -662,7 +662,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         class qemu_zcu102(qemu_app_wrapper):
             def __init__(self, cpu, memory, res_path, dev_path):
                 super().__init__('/opt/xilinx-qemu/bin/qemu-system-aarch64',
-                                    None, cpu, memory)
+                                 'arm-generic-fdt', cpu, memory)
 
                 if not os.path.isdir(res_path):
                     raise Exception('res_path Directory {} does not exist!'.format(res_path))
@@ -684,7 +684,6 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.load_elf(u_boot_elf)
 
                 self.add_params(
-                    '-machine', 'arm-generic-fdt',
                     '-dtb', dtb_f,
                     '-global', 'xlnx,zynqmp-boot.cpu-num=0',
                     '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
@@ -695,7 +694,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         class qemu_microblaze(qemu_app_wrapper):
             def __init__(self, cpu, memory, res_path, dev_path):
                 super().__init__('/opt/xilinx-qemu/bin/qemu-system-microblazeel',
-                                    None, cpu, memory)
+                                 'microblaze-fdt', cpu, memory)
 
                 if res_path == None:
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
@@ -703,7 +702,6 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.load_elf(os.path.join(res_path, 'pmufw.elf'))
 
                 self.add_params(
-                    '-machine', 'microblaze-fdt',
                     '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
                     '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
                     '-machine-path', dev_path)
