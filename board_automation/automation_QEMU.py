@@ -357,6 +357,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             def __init__(self, binary, machine, cpu, memory):
                 self.binary = binary
                 self.machine = machine
+                self.dtb = None
                 self.cpu = cpu
                 self.cores = None
                 self.memory = memory
@@ -545,6 +546,9 @@ class QemuProxyRunner(board_automation.System_Runner):
                 if self.machine:
                     cmd_arr += ['-machine', self.machine]
 
+                if self.dtb:
+                    cmd_arr += ['-dtb', self.dtb]
+
                 if self.cpu:
                     cmd_arr += ['-cpu', self.cpu]
 
@@ -680,11 +684,11 @@ class QemuProxyRunner(board_automation.System_Runner):
                     raise Exception('The resource directory does not contain all \
                                         necessary files to start QEMU')
 
+                self.dtb = dtb_f
                 self.load_elf(bl_elf, {'cpu-num': 0})
                 self.load_elf(u_boot_elf)
 
                 self.add_params(
-                    '-dtb', dtb_f,
                     '-global', 'xlnx,zynqmp-boot.cpu-num=0',
                     '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
                     '-machine-path', dev_path)
@@ -699,10 +703,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                 if res_path == None:
                     raise Exception('ERROR: qemu_microblaze requires the resource path')
 
+                self.dtb = os.path.join(res_path, 'zynqmp-pmu.dtb')
                 self.load_elf(os.path.join(res_path, 'pmufw.elf'))
 
                 self.add_params(
-                    '-dtb', os.path.join(res_path, 'zynqmp-pmu.dtb'),
                     '-kernel', os.path.join(res_path, 'pmu_rom_qemu_sha3.elf'),
                     '-machine-path', dev_path)
 
