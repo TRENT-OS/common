@@ -8,32 +8,25 @@ occurred
 """
 
 import re
-import fcntl
-import os
 from board_automation import tools
 
 
 #------------------------------------------------------------------------------
-def open_file_non_blocking(file_name, mode, newline=None):
+def open_file_non_blocking(file_name, mode='rt', newline=None,
+                           encoding='latin-1'):
     """
-    Opens a file and set non blocking OS flag
-
-    Args:
-    file_name(str): the file full path
-    mode: mode to pass to open()
-    nl(str, optional): newline
-
-    Returns:
-    f(file): the file object
+    Opens a file and set non blocking OS flag. By default, the file is opened as
+    'text file' in 'read-only' mode and universal newline detection is applies.
+    Encoding default to 'latin-1' instead the python's 'utf-8' default to stick
+    to single-byte chars and avoid encoding exceptions in case corrupted data is
+    read.
+    Returns a file object.
     """
 
-    f = open(file_name, mode, newline=newline)
-    fd = f.fileno()
-    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
-    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-
-    return f
+    return tools.Log_File(file_name).open_non_blocking(
+                mode = mode,
+                newline = newline,
+                encoding = encoding)
 
 
 #------------------------------------------------------------------------------
