@@ -736,6 +736,12 @@ def get_qemu(target, printer=None):
             # The qemu-system-riscv32 sifive_u uses U34/E31 cores
             'cores':    5
         },
+        'polarfire': {
+            'qemu-bin': '/opt/hc/qemu-6.0.0/bin/qemu-system-riscv64',
+            'machine':  'microchip-icicle-kit',
+            'memory':   2048,
+            'cores':    5 # 1x E51 and 5x U54
+        },
         'rpi3': {
             'qemu-bin': 'qemu-system-aarch64',
             'machine':  'raspi3',
@@ -966,6 +972,7 @@ class QemuProxyRunner():
 
         if platform in [
             'hifive',
+            'polarfire',
             'migv_qemu',
             'qemu-riscv-virt64',
             'qemu-riscv-virt32',
@@ -1055,6 +1062,7 @@ class QemuProxyRunner():
             if machine in [
                 'spike',
                 'sifive_u',
+                'microchip-icicle-kit',
                 'mig-v',
                 'virt'
             ]:

@@ -31,6 +31,7 @@ def get_test_runner(run_context):
             'spike32',
             'spike64',
             'hifive',
+            'polarfire',
             'migv_qemu',
             'qemu-arm-virt-a15',
             'qemu-arm-virt-a53',
