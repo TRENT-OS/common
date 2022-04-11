@@ -534,8 +534,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                     'id': dev_id,
                     'host': host,
                     'port': port,
-                    'server': None,
-                    'nowait': None,
+                    'server': 'on',
+                    'wait': 'off',
                     'logfile': sys_log_path,
                     'signal': 'off'
                 })
