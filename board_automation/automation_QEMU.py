@@ -452,6 +452,15 @@ class QEMU_AppWrapper:
 
 
     #---------------------------------------------------------------------------
+    def get_machine(self):
+        param = self.config.get('machine', None)
+        if param and isinstance(param, list):
+            assert(isinstance(param[0], str))
+            assert(isinstance(param[1], dict)) # may have 'dumpdtb=<filename>'
+            param = param[0]
+        return param
+
+    #---------------------------------------------------------------------------
     def get_qemu_start_cmd_params_array(
         self,
         printer = None):
@@ -468,6 +477,10 @@ class QEMU_AppWrapper:
         if param is None:
             printer.print('no machine given for QEMU')
             return None
+        if isinstance(param, list):
+            assert(isinstance(param[0], str))
+            assert(isinstance(param[1], dict)) # may have 'dumpdtb=<filename>'
+            param = param[0] + ',' + self.serialize_param_dict(param[1])
         cmd_arr += ['-machine', param]
 
         param = cfg.pop('dtb', None)
@@ -751,13 +764,23 @@ def get_qemu(target, printer=None):
         },
         'qemu-arm-virt-a15': {
             'qemu-bin': '/opt/hc/bin/qemu-system-arm',
-            'machine':  'virt',
+            'machine':  ['virt', {
+                'secure':         'off',
+                'virtualization': 'on',
+                'highmem':        'off',
+                'gic-version':    '2',
+            }],
             'cpu':      'cortex-a15',
             'memory':   2048,
         },
         'qemu-arm-virt-a53': {
-            'qemu-bin': 'qemu-system-aarch64',
-            'machine':  'virt',
+            'qemu-bin':   'qemu-system-aarch64',
+            'machine':    ['virt', {
+                'secure':         'off',
+                'virtualization': 'on',
+                'highmem':        'on',
+                'gic-version':    '2',
+            }],
             'cpu':      'cortex-a53',
             'memory':   2048,
         },
@@ -985,7 +1008,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             # the proxy)
             qemu.add_dev_nic_tap('tap2')
 
-        elif qemu.config['machine'] == 'virt':
+        elif qemu.get_machine() == 'virt':
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
@@ -1004,7 +1027,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 self.run_context.log_dir)
         elif self.sd_card_size and (self.sd_card_size > 0):
             # SD card (might be ignored if target does not support this)
-            machine = qemu.config['machine']
+            machine = qemu.get_machine()
             if (machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
                 self.print(f'QEMU: ignoring SD card image, not supported for {machine}')
             else:
