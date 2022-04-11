@@ -267,13 +267,567 @@ class TcpBridge():
 #===============================================================================
 #===============================================================================
 
-class QemuMachineCfg:
-    def __init__(self, constructor, param_list):
-        self.constructor = constructor
-        self.param_list = param_list
+class QEMU_AppWrapper:
 
-    def create_qemu(self):
-        return self.constructor(*self.param_list)
+    #---------------------------------------------------------------------------
+    def __init__(self, params_dict = dict()):
+
+        self.config = {
+            'qemu-bin': None,
+            'machine': None,
+            'dtb': None,
+            'cpu': None,
+            'cores': None,
+            'memory': None,
+            # currently we don't have any platform that has a monitor
+            'graphic': None,
+            # 'kernel' is the common option to boot an OS like Linux,
+            # 'bios' is machine specific to load firmware. On RISC-V,
+            # 'bios' allows booting the system in M-Mode and install a
+            # custom SBI, while 'kernel' will make QEMU use an OpenSBI
+            # firmware that comes with QEMU and boots the given OS in
+            # S-Mode.
+            'bios': None,
+            'kernel':  None,
+            # enable for instruction tracing
+            'singlestep': False,
+            # There can be multiple drives, devices, SD-Card or NICs.
+            # Python guarantees the order is preserved when adding
+            # elements to an array.
+            'drives': [],
+            'devices': [],
+            'serial_ports': [],
+            # Defaults are set, add or overwrite custom config. Python support
+            # for merging dictionaries:
+            #   Python >= 3.9:  z = x | y
+            #   Python >= 3.5:  z = {**x, **y}
+            #   else:           z = x.copy(); z.update(y); return z
+            **params_dict
+        }
+
+        # SD card devices based on images need unique numbers.
+        self.num_sdcard_images = 0
+
+        self.raw_params = []
+
+    #---------------------------------------------------------------------------
+    def add_params(self, *argv):
+        for arg in argv:
+            if isinstance(arg, list):
+                self.raw_params.extend(arg)
+            else:
+                self.raw_params.append(arg)
+
+
+    #---------------------------------------------------------------------------
+    def serialize_param_dict(self, arg_dict):
+        # Python 3.6 made the standard dict type maintain the insertion
+        # order. With older versions the iteration order is random.
+        return None if arg_dict is None \
+               else ','.join([
+                    (f'{key}' if value is None \
+                        else f'{key}={value}')
+                    for (key, value) in arg_dict.items()
+               ])
+
+
+    #---------------------------------------------------------------------------
+    def add_serial_port(self, port):
+        # A list preserves the order of added elements
+        self.config['serial_ports'] += [port]
+
+
+    #---------------------------------------------------------------------------
+    def add_drive(self, param_dict):
+        # A list preserves the order of added elements
+        self.config['drives'] += [param_dict]
+
+
+
+    #---------------------------------------------------------------------------
+    def add_device(self, dev_type, sub_type, param_dict = None):
+        # A list preserves the order of added elements
+        self.config['devices'] += [ (dev_type, sub_type, param_dict) ]
+
+
+    #---------------------------------------------------------------------------
+    def add_dev_nic_none(self):
+        # Any dummy NIC is just another device
+        self.add_device('nic', 'none', None)
+
+
+    #---------------------------------------------------------------------------
+    def add_dev_nic_tap(self, tap, param_dict = dict()):
+        full_param_dict = {
+            'ifname': tap,
+            'script': 'no'
+        }
+        full_param_dict.update(param_dict)
+        # Any TAP NIC is just another device
+        self.add_device('nic', 'tap', full_param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def add_dev_char_socket(self, param_dict):
+        assert(len(param_dict) > 0)  # there must be parameters
+        # Any chardevice based on a socket is basically just another
+        # device
+        self.add_device('chardev', 'socket', param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def add_sdcard_from_image(self, sd_card_image):
+        dev_id = f'sdcardimg{self.num_sdcard_images}'
+        self.num_sdcard_images += 1
+        # Add a drive with the file and connect the SD-Card to it.
+        self.add_drive({
+            'id': dev_id,
+            'file': sd_card_image,
+            'format': 'raw',
+        })
+        self.add_device('device', 'sd-card', {'drive': dev_id})
+
+
+    #---------------------------------------------------------------------------
+    def add_dev_loader(self, param_dict):
+        assert(len(param_dict) > 0)  # there must be loader parameters
+        self.add_device('device', 'loader', param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def init_memory_at(self, address, value, param_dict = dict()):
+        full_param_dict = {
+            'addr': address,
+            'data': value,
+            'data-len': 4
+        }
+        full_param_dict.update(param_dict)
+        self.add_dev_loader(full_param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def load_blob(self, address, filename, param_dict = dict()):
+
+        if not os.path.isfile(filename):
+            raise Exception(f'Missing blob file: {filename}')
+
+        full_param_dict = {
+            'addr': address,
+            'file': filename
+        }
+        full_param_dict.update(param_dict)
+        self.add_dev_loader(full_param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def load_elf(self, filename, param_dict = dict()):
+
+        if not os.path.isfile(filename):
+            raise Exception(f'Missing ELF file: {filename}')
+
+        full_param_dict = {
+            'file': filename
+        }
+        full_param_dict.update(param_dict)
+        self.add_dev_loader(full_param_dict)
+
+
+    #---------------------------------------------------------------------------
+    def sys_log_setup(self, sys_log_path, host, port, id):
+        # In addition to outputting the guest system log to a log file,
+        # we are opening a 2-way TCP socket connected to the same serial
+        # device that allows the test suite to communicate with the
+        # guest during the test execution.
+        dev_id = f'chardev{id}'
+        self.add_dev_char_socket({
+            'id': dev_id,
+            'host': host,
+            'port': port,
+            'server': 'on',
+            'wait': 'off',
+            'logfile': sys_log_path,
+            'signal': 'off'
+        })
+        self.add_serial_port(f'chardev:{dev_id}')
+
+
+    #---------------------------------------------------------------------------
+    def get_qemu_start_cmd_params_array(
+        self,
+        printer = None):
+
+        cfg = self.config.copy()
+
+        param = cfg.pop('qemu-bin', None)
+        if param is None:
+            printer.print('no binary given for QEMU')
+            return None
+        cmd_arr = [ param ]
+
+        param = cfg.pop('machine', None)
+        if param is None:
+            printer.print('no machine given for QEMU')
+            return None
+        cmd_arr += ['-machine', param]
+
+        param = cfg.pop('dtb', None)
+        if param:
+            cmd_arr += ['-dtb', param]
+
+        param = cfg.pop('cpu', None)
+        if param:
+            cmd_arr += ['-cpu', param]
+
+        param = cfg.pop('cores', None)
+        if param:
+            cmd_arr += ['-smp', str(param)]
+
+        param = cfg.pop('memory', None)
+        if param:
+            cmd_arr += ['-m', f'size={param}M']
+
+        param = cfg.pop('graphic', False)
+        if not param: # works also is set to None
+            cmd_arr += ['-nographic']
+
+        param = cfg.pop('singlestep', False)
+        if param: # works also is set to None
+            cmd_arr += ['-singlestep']
+
+        param = cfg.pop('kernel', None)
+        if param:
+            cmd_arr += ['-kernel', param]
+
+        param = cfg.pop('bios', None)
+        if param:
+            cmd_arr += ['-bios', param]
+
+        # SD-Card images are basically a device/drive combination
+        param = cfg.pop('sdcard_images', [])
+        for i, img in enumerate(param):
+            dev_id = f'sdcardimg{i}'
+            self.add_drive({
+                'id': dev_id,
+                'file': sd_card_image,
+                'format': 'raw',
+            })
+            self.add_dev_sdcard({'drive': dev_id})
+
+        param = cfg.pop('drives', [])
+        for param_dict in param:
+            assert(len(param_dict) > 0)  # there must be parameters
+            cmd_arr += ['-drive', self.serialize_param_dict(param_dict)]
+
+        param = cfg.pop('devices', [])
+        for (dev_type, sub_type, param_dict) in param:
+            cmd_arr += [
+                '-' + dev_type,
+                sub_type if param_dict is None \
+                else ','.join([
+                    sub_type,
+                    self.serialize_param_dict(param_dict)
+                ])
+            ]
+
+        # connect all serial ports
+        param = cfg.pop('serial_ports', [])
+        for p in param:
+            cmd_arr += ['-serial', p if p else 'null']
+
+        if cfg:
+            if printer:
+                printer.print(f'QEMU: unsupported config: {cfg}')
+            return None
+
+        return cmd_arr + self.raw_params
+
+
+    #---------------------------------------------------------------------------
+    def start(
+        self,
+        log_file_stdout,
+        log_file_stderr,
+        additional_params = None,
+        printer = None,
+        print_log = False):
+
+        if additional_params:
+            for param in additional_params:
+                if param[2] == self.Additional_Param_Type.VALUE:
+                    self.init_memory_at(param[0], param[1])
+                elif param[2] == self.Additional_Param_Type.BINARY_IMG:
+                    self.load_blob(param[0], param[1])
+                else:
+                    printer.print(f'QEMU: additional parameter type {param[2]}'
+                                   ' not supported!')
+
+        cmd_param_array = self.get_qemu_start_cmd_params_array(printer)
+
+        if cmd_param_array is None:
+            printer.print('could not create QEMU command line')
+            return None
+
+        if printer:
+            printer.print(f'QEMU: {" ".join(cmd_param_array)}')
+
+        process = process_tools.ProcessWrapper(
+                    cmd_param_array,
+                    log_file_stdout = log_file_stdout,
+                    log_file_stderr = log_file_stderr,
+                    printer = printer,
+                    name = 'QEMU' )
+
+        process.start(print_log)
+
+        return process
+
+
+#-------------------------------------------------------------------------------
+class QEMU_zcu102(QEMU_AppWrapper):
+
+    def __init__(self, param_dict = dict()):
+        super().__init__(
+            {
+                'qemu-bin': '/host/qemu/xilinx-v2022.1/qemu-system-aarch64',
+                'machine':  'arm-generic-fdt',
+                # Defaults are set, add or overwrite custom config.
+                **param_dict
+            })
+
+        self.qemu_pmu = QEMU_AppWrapper({
+            'qemu-bin': '/host/qemu/xilinx-v2022.1/qemu-system-microblazeel',
+            'machine':  'microblaze-fdt',
+        })
+
+
+    #---------------------------------------------------------------------------
+    # ToDo: generalize this hack and put a setup() in QEMU_AppWrapper
+    def setup(self, res_dir, log_dir):
+
+        if not os.path.isdir(res_dir):
+            raise Exception(f'res_dir Directory {res_dir} does not exist!')
+
+        if not os.path.isdir(log_dir):
+            raise Exception(f'log_dir Directory {log_dir} does not exist!')
+
+        # PE (ARM cluster) software
+        pe_dtb          = os.path.join(res_dir, 'zcu102-arm.dtb')
+        pe_bl_elf       = os.path.join(res_dir, 'bl31.elf')
+        pe_u_boot_elf   = os.path.join(res_dir, 'u-boot.elf')
+        # PMU (MicroBlaze) software
+        pmu_dtb        = os.path.join(res_dir, 'zynqmp-pmu.dtb')
+        pmu_kernel_elf = os.path.join(res_dir, 'pmu_rom_qemu_sha3.elf')
+        pmu_fw_elf     = os.path.join(res_dir, 'pmufw.elf')
+
+        if not os.path.isfile(pe_dtb) or \
+           not os.path.isfile(pe_bl_elf) or \
+           not os.path.isfile(pe_u_boot_elf) or \
+           not os.path.isfile(pmu_dtb) or \
+           not os.path.isfile(pmu_kernel_elf) or \
+           not os.path.isfile(pmu_fw_elf):
+            raise Exception('The resource directory does not contain \
+                             all necessary files to start QEMU')
+
+        # We don't pass a kernel to QEMU, because for the zcu102 platform is has
+        # "ROM code" that can boot U-Boot from an SD card. A special U-Boot
+        # version has been created that loads os_image.elf then.
+        sd_card_image = os.path.join(log_dir, 'sdcard1.img')
+        # ToDo: 128 MiB seems a lot if we just store os_image.elf there.
+        tools.create_sd_img(
+            sd_card_image,
+            128*1024*1024, # 128 MiB
+            [(self.run_context.system_image, 'os_image.elf')])
+        qemu.config['kernel'] = None
+        seld.add_sdcard_from_image(sd_card_image)
+        self.config['dtb'] = pe_dtb
+        self.add_params(
+            '-global', 'xlnx,zynqmp-boot.cpu-num=0',
+            '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
+            '-machine-path', log_dir)
+        self.load_elf(pe_bl_elf, {'cpu-num': 0})
+        self.load_elf(pe_u_boot_elf)
+
+        self.qemu_pmu.config['dtb'] = pmu_dtb
+        self.qemu_pmu.config['kernel'] = pmu_kernel_elf
+        self.qemu_pmu.add_params('-machine-path', log_dir)
+        self.qemu_pmu.load_elf(pmu_fw_elf)
+
+
+    #---------------------------------------------------------------------------
+    def start(
+        self,
+        log_file_stdout,
+        log_file_stderr,
+        additional_params = None,
+        printer = None,
+        print_log = False):
+
+        def pmu_logfile(parent_log_file, channel):
+            return os.path.join(
+                    os.path.dirname(parent_log_file),
+                    f'qemu_pmu_{channel}.txt')
+
+        # start PMU (MicroBlaze) instance first
+        process_qemu_pmu = self.qemu_pmu.start(
+            log_file_stdout = pmu_logfile(log_file_stdout, 'out'),
+            log_file_stderr = pmu_logfile(log_file_stderr, 'err'),
+            additional_params = None,
+            printer = printer,
+            print_log = print_log
+        )
+
+        # start PE (ARM Cluster) instance afterwards
+        process_qemu_pe = super().start(
+            log_file_stdout = log_file_stdout,
+            log_file_stderr = log_file_stderr,
+            additional_params = additional_params,
+            printer = printer,
+            print_log = print_log
+        )
+
+        class Process_qemu_zcu102_microblaze():
+            def __init__(self, processes):
+                self.processes = processes
+            def is_running(self):
+                return all([p.is_running() for p in self.processes])
+            def terminate(self):
+                for p in self.processes: p.terminate()
+
+        return Process_qemu_zcu102_microblaze([process_qemu_pe, process_qemu_pmu])
+
+
+#-------------------------------------------------------------------------------
+def get_qemu(target, printer=None):
+
+    qemu_cfgs = {
+        'sabre': {
+            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'machine':  'sabrelite',
+            'memory':   1024
+        },
+        'migv_qemu': {
+            'qemu-bin': '/opt/hc/migv/bin/qemu-system-riscv64',
+            'machine': 'mig-v',
+            'memory':   1024,
+        },
+        'hifive': {
+            'qemu-bin': 'qemu-system-riscv64',
+            'machine':  'sifive_u',
+            'memory':   8192,
+            # Core setting works as:
+            #   1: 1x U54, 1x E51
+            #   2: 1x U54, 1x E51
+            #   3  2x U54, 1x E51
+            #   4: 3x U54, 1x E51
+            #   5: 4x U54, 1x E51
+            # The qemu-system-riscv32 sifive_u uses U34/E31 cores
+            'cores':    5
+        },
+        'rpi3': {
+            'qemu-bin': 'qemu-system-aarch64',
+            'machine':  'raspi3',
+            'memory':   1024,
+        },
+        'spike64': {
+            'qemu-bin': 'qemu-system-riscv64',
+            'machine':  'spike',
+            'cpu':      'rv64',
+            'memory':   4095,
+        },
+        'spike32': {
+            'qemu-bin': 'qemu-system-riscv32',
+            'machine':  'spike',
+            'cpu':      'rv32',
+            'memory':   1024,
+        },
+        'zynq7000': {
+            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'machine':  'xilinx-zynq-a9',
+            'memory':   1024,
+        },
+        'zynqmp': {
+            'qemu-bin': QEMU_zcu102, # this is really the class, not an instance
+            'memory':   4096,
+        },
+        'qemu-arm-virt-a15': {
+            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'machine':  'virt',
+            'cpu':      'cortex-a15',
+            'memory':   2048,
+        },
+        'qemu-arm-virt-a53': {
+            'qemu-bin': 'qemu-system-aarch64',
+            'machine':  'virt',
+            'cpu':      'cortex-a53',
+            'memory':   2048,
+        },
+        'qemu-arm-virt-a57': {
+            'qemu-bin': 'qemu-system-aarch64',
+            'machine':  'virt',
+            'cpu':      'cortex-a57',
+            'memory':   2048,
+        },
+        'qemu-arm-virt-a72': {
+            'qemu-bin': 'qemu-system-aarch64',
+            'machine':  'virt',
+            'cpu':      'cortex-a72',
+            'memory':   2048,
+        },
+    }
+
+    if not target:
+        if printer:
+            printer.print('empty QEMU target')
+        return None
+
+    qemu_cfg = qemu_cfgs.get(target)
+    if not qemu_cfg:
+        if printer:
+            printer.print(f'unsupported QEMU target: "{target}"')
+        return None
+
+    qemu_bin = qemu_cfg['qemu-bin'];
+    if not qemu_cfg:
+        if printer:
+            printer.print(f'no binary for QEMU target: "{target}"')
+        return None
+
+    if isinstance(qemu_bin, str):
+        qemu_cfg['qemu-bin'] = qemu_bin
+        return QEMU_AppWrapper(qemu_cfg)
+
+    # Instead of a string, a class reference can also be used. The actual
+    # instantiation only happens if this is also the target that the tests used.
+    # The try-except block is needed because issubclass() throws an exception if
+    # the parameter is not a class. Doing a check inspect.isclass() first could
+    # avoid the try-except.
+    try:
+        if issubclass(qemu_bin, QEMU_AppWrapper):
+            return qemu_bin()
+    except TypeError:
+        pass
+
+    # An instance can also be specified. However, adding instances to qemu_cfgs
+    # should be avoided because the instantiation will always happen, even if
+    # the tar is running for a different target and thus the instance is never
+    # used.
+    if isinstance(qemu_bin, QEMU_AppWrapper):
+        return qemu_bin
+
+    # Don't know which QEMU to use.
+    if printer:
+        printer.print(f'unsupported binary for QEMU target: "{target}", "{qemu_bin}"')
+
+    return None
+
+
+#===============================================================================
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+class Additional_Param_Type(IntEnum):
+    VALUE       = 0,
+    BINARY_IMG  = 1,
 
 
 #-------------------------------------------------------------------------------
@@ -369,416 +923,25 @@ class QemuProxyRunner(board_automation.System_Runner):
     #---------------------------------------------------------------------------
     def start_qemu(self, print_log):
 
-        #-----------------------------------------------------------------------
-        class qemu_app_wrapper:
-            #-------------------------------------------------------------------
-            def __init__(self, binary, machine, cpu, memory):
-                self.binary = binary
-                self.machine = machine
-                self.dtb = None
-                self.cpu = cpu
-                self.cores = None
-                self.memory = memory
-
-                # 'kernel' is the common option to boot an OS like Linux, 'bios'
-                # is machine specific to load firmware. On RISC-V, 'bios' allows
-                # booting the system in M-Mode and install a custom SBI, while
-                # 'kernel' will make QEMU use an OpenSBI firmware that comes
-                # with QEMU and boots the given OS in S-Mode.
-                self.bios = None
-                self.kernel = None
-
-                # By default this is off, since we currently don't have any
-                # platform that uses this.
-                self.graphic = False
-
-                # enable for instruction tracing
-                self.singlestep = False
-
-                # There can be multiple drives, devices, serial ports and NICs.
-                # Python guarantees the order is preserved when adding elements
-                # to an array.
-                self.drives = []
-                self.devices = []
-                self.serial_ports = []
-                # SD card devices based on images need unique numbers.
-                self.num_sdcard_images = 0
-
-                # additional parameters passed to QEMU
-                self.params = []
-
-            #-------------------------------------------------------------------
-            def add_params(self, *argv):
-                for arg in argv:
-                    if isinstance(arg, list):
-                        self.params.extend(arg)
-                    else:
-                        self.params.append(arg)
-
-
-            #-------------------------------------------------------------------------------
-            def serialize_param_dict(self, arg_dict):
-                # Python 3.6 made the standard dict type maintain the insertion
-                # order. With older versions the iteration order is random.
-                return None if arg_dict is None \
-                       else ','.join([
-                            (f'{key}' if value is None \
-                                else f'{key}={value}')
-                            for (key, value) in arg_dict.items()
-                       ])
-
-
-            #-------------------------------------------------------------------------------
-            def add_serial_port(self, port):
-                # A list preserves the order of added element
-                self.serial_ports += [port]
-
-
-            #-------------------------------------------------------------------------------
-            def add_drive(self, param_dict):
-                self.drives += [param_dict]
-
-
-            #-------------------------------------------------------------------------------
-            def add_device(self, dev_type, sub_type, param_dict = None):
-                self.devices += [ (dev_type, sub_type, param_dict) ]
-
-
-            #-------------------------------------------------------------------------------
-            def add_dev_nic_none(self):
-                # Any dummy NIC is just another device
-                self.add_device('nic', 'none', None)
-
-
-            #-------------------------------------------------------------------------------
-            def add_dev_nic_tap(self, tap, param_dict = dict()):
-                full_param_dict = {
-                    'ifname': tap,
-                    'script': 'no'
-                }
-                full_param_dict.update(param_dict)
-                # Any TAP NIC is just another device
-                self.add_device('nic', 'tap', full_param_dict)
-
-
-            #-------------------------------------------------------------------------------
-            def add_dev_char_socket(self, param_dict):
-                assert(len(param_dict) > 0)  # there must be parameters
-                # Any chardevice based on a socket is basically just another
-                # device
-                self.add_device('chardev', 'socket', param_dict)
-
-
-            #-------------------------------------------------------------------------------
-            def add_sdcard_from_image(self, sd_card_image):
-                dev_id = f'sdcardimg{self.num_sdcard_images}'
-                self.num_sdcard_images += 1
-                # Add a drive with the file and connect the SD-Card to it.
-                self.add_drive({
-                    'id': dev_id,
-                    'file': sd_card_image,
-                    'format': 'raw',
-                })
-                self.add_device('device', 'sd-card', {'drive': dev_id})
-
-
-            #-------------------------------------------------------------------------------
-            def add_dev_loader(self, param_dict):
-                assert(len(param_dict) > 0)  # there must be loader parameters
-                self.add_device('device', 'loader', param_dict)
-
-
-            #-------------------------------------------------------------------------------
-            def init_memory_at(self, address, value, param_dict = dict()):
-                full_param_dict = {
-                    'addr': address,
-                    'data': value,
-                    'data-len': 4
-                }
-                full_param_dict.update(param_dict)
-                self.add_dev_loader(full_param_dict)
-
-
-            #-------------------------------------------------------------------------------
-            def load_blob(self, address, filename, param_dict = dict()):
-
-                if not os.path.isfile(filename):
-                    raise Exception(f'Missing blob file: {filename}')
-
-                full_param_dict = {
-                    'addr': address,
-                    'file': filename
-                }
-                full_param_dict.update(param_dict)
-                self.add_dev_loader(full_param_dict)
-
-
-            #-------------------------------------------------------------------------------
-            def load_elf(self, filename, param_dict = dict()):
-
-                if not os.path.isfile(filename):
-                    raise Exception(f'Missing ELF file: {filename}')
-
-                full_param_dict = {
-                    'file': filename
-                }
-                full_param_dict.update(param_dict)
-                self.add_dev_loader(full_param_dict)
-
-            #-------------------------------------------------------------------
-            def sys_log_setup(self, sys_log_path, host, port, id):
-                # In addition to outputting the guest system log to a log file,
-                # we are opening a 2-way TCP socket connected to the same serial
-                # device that allows the test suite to communicate with the
-                # guest during the test execution.
-                dev_id = f'chardev{id}'
-                self.add_dev_char_socket({
-                    'id': dev_id,
-                    'host': host,
-                    'port': port,
-                    'server': 'on',
-                    'wait': 'off',
-                    'logfile': sys_log_path,
-                    'signal': 'off'
-                })
-                self.add_serial_port(f'chardev:{dev_id}')
-
-
-            #-------------------------------------------------------------------------------
-            class Additional_Param_Type(IntEnum):
-                VALUE       = 0,
-                BINARY_IMG  = 1,
-
-
-            #-------------------------------------------------------------------
-            def start(
-                self,
-                log_file_stdout,
-                log_file_stderr,
-                additional_params = None,
-                printer = None,
-                print_log = False):
-
-                cmd_arr = []
-
-                if self.machine:
-                    cmd_arr += ['-machine', self.machine]
-
-                if self.dtb:
-                    cmd_arr += ['-dtb', self.dtb]
-
-                if self.cpu:
-                    cmd_arr += ['-cpu', self.cpu]
-
-                if self.cores:
-                    cmd_arr += ['-smp', str(self.cores)]
-
-                if self.memory:
-                    cmd_arr += ['-m', f'size={self.memory}M']
-
-                if not self.graphic:
-                    cmd_arr += ['-nographic']
-
-                if self.singlestep:
-                    cmd_arr += ['-singlestep']
-
-                if self.kernel:
-                    cmd_arr += ['-kernel', self.kernel]
-
-                if self.bios:
-                    cmd_arr += ['-bios', self.bios]
-
-                for param_dict in self.drives:
-                    assert(len(param_dict) > 0)  # there must be parameters
-                    cmd_arr += ['-drive', self.serialize_param_dict(param_dict)]
-
-                # NICs and CharDevs are also just devices, because the parameter
-                # format is the same.
-                for (dev_type, sub_type, param_dict) in self.devices:
-                    cmd_arr += [
-                        '-' + dev_type,
-                        sub_type if param_dict is None \
-                        else ','.join([
-                            sub_type,
-                            self.serialize_param_dict(param_dict)
-                        ])
-                    ]
-
-                # Serial ports might be connected to devices from above.
-                for p in self.serial_ports:
-                    cmd_arr += ['-serial', p if p else 'null']
-
-                if additional_params:
-                    for param in additional_params:
-                        if param[2] == self.Additional_Param_Type.VALUE:
-                            self.init_memory_at(param[0], param[1])
-                        elif param[2] == self.Additional_Param_Type.BINARY_IMG:
-                            self.load_blob(param[0], param[1])
-                        else:
-                            printer.print(f'QEMU: additional parameter type' \
-                                           '{param[2]} not supported!')
-
-                cmd = [ self.binary ] + cmd_arr + self.params
-
-                if printer:
-                    printer.print(f'QEMU: {" ".join(cmd)}')
-
-                process = process_tools.ProcessWrapper(
-                            cmd,
-                            log_file_stdout = log_file_stdout,
-                            log_file_stderr = log_file_stderr,
-                            printer = printer,
-                            name = 'QEMU' )
-
-                process.start(print_log)
-
-                return process
-
-
-        #-----------------------------------------------------------------------
-        class qemu_aarch32(qemu_app_wrapper):
-            def __init__(self, machine, cpu, memory):
-                super().__init__(
-                    '/opt/hc/bin/qemu-system-arm',
-                    machine, cpu, memory)
-
-
-        #-----------------------------------------------------------------------
-        class qemu_aarch64(qemu_app_wrapper):
-            def __init__(self, machine, cpu, memory):
-                super().__init__('qemu-system-aarch64', machine, cpu, memory)
-
-
-        #-----------------------------------------------------------------------
-        class qemu_riscv64(qemu_app_wrapper):
-            def __init__(self, machine, cpu, memory):
-                super().__init__('qemu-system-riscv64', machine, cpu, memory)
-                #     microchip-icicle-kit  Microchip PolarFire
-                #     none                  empty machine
-                #     sifive_e              SiFive E SDK
-                #     sifive_u              SiFive U SDK (1x E51, up to 4x U54)
-                #     spike                 (default)
-                #     virt                  VirtIO board (rv32gc/rv64gc)
-                #   dump the device tree with "<machine>,dumpdtb=dtb.out"
-                # -cpu <'help' or one form the list>
-                # -machine <'help' or one form the list>:
-                #     any
-                #     rv64
-                #     sifive-e51
-                #     sifive-u54
-
-
-        #-----------------------------------------------------------------------
-        class qemu_migv(qemu_app_wrapper):
-            def __init__(self, machine, cpu, memory):
-                super().__init__('/opt/hc/migv/bin/qemu-system-riscv64', machine, cpu, memory)
-
-
-        #-----------------------------------------------------------------------
-        class qemu_riscv32(qemu_app_wrapper):
-            def __init__(self, machine, cpu, memory):
-                super().__init__('qemu-system-riscv32', machine, cpu, memory)
-
-
-        #-----------------------------------------------------------------------
-        class qemu_zcu102(qemu_app_wrapper):
-            def __init__(self, cpu, memory, res_path, dev_path):
-                super().__init__('/opt/xilinx-qemu/bin/qemu-system-aarch64',
-                                 'arm-generic-fdt', cpu, memory)
-
-                if not os.path.isdir(res_path):
-                    raise Exception(f'res_path Directory {res_path} does not exist!')
-
-                if not os.path.isdir(dev_path):
-                    raise Exception(f'dev_path Directory {res_path} does not exist!')
-
-                dtb_f = os.path.join(res_path, 'zcu102-arm.dtb')
-                bl_elf = os.path.join(res_path, 'bl31.elf')
-                u_boot_elf = os.path.join(res_path, 'u-boot.elf')
-
-                if not os.path.isfile(dtb_f) or \
-                    not os.path.isfile(bl_elf) or \
-                    not os.path.isfile(u_boot_elf):
-                    raise Exception('The resource directory does not contain' \
-                                    ' all necessary files to start QEMU')
-
-                self.dtb = dtb_f
-                self.load_elf(bl_elf, {'cpu-num': 0})
-                self.load_elf(u_boot_elf)
-
-                self.add_params(
-                    '-global', 'xlnx,zynqmp-boot.cpu-num=0',
-                    '-global', 'xlnx,zynqmp-boot.use-pmufw=true',
-                    '-machine-path', dev_path)
-
-
-        #-----------------------------------------------------------------------
-        class qemu_microblaze(qemu_app_wrapper):
-            def __init__(self, cpu, memory, res_path, dev_path):
-                super().__init__('/opt/xilinx-qemu/bin/qemu-system-microblazeel',
-                                 'microblaze-fdt', cpu, memory)
-
-                if res_path is None:
-                    raise Exception('ERROR: qemu_microblaze requires the resource path')
-
-                self.dtb = os.path.join(res_path, 'zynqmp-pmu.dtb')
-                self.kernel = os.path.join(res_path, 'pmu_rom_qemu_sha3.elf')
-                self.load_elf(os.path.join(res_path, 'pmufw.elf'))
-
-                self.add_params('-machine-path', dev_path)
-
-
         assert( not self.is_qemu_running() )
+        qemu = get_qemu(
+                target  = self.run_context.platform,
+                printer = self.get_printer())
+        assert( qemu is not None )
 
-        # Because some platforms require different parameters, it is better to
-        # avoid initializing all QEMU machine configurations on every test run.
-        # QemuMachineCfg is a wrapper class that contains a QEMU machine
-        # constructor function, a list of parameters and a function to only
-        # initialize a single QEMU configuration needed for the current test run.
-        qemu_cfgs = {
-            'sabre':        QemuMachineCfg(qemu_aarch32, ['sabrelite', None, 1024]),
-            'migv_qemu':    QemuMachineCfg(qemu_migv,    ['mig-v', None, 1024]),
-            'hifive':       QemuMachineCfg(qemu_riscv64, ['sifive_u', None, 8192]),
-            'rpi3':         QemuMachineCfg(qemu_aarch64, ['raspi3', None, 1024]),
-            'spike64':      QemuMachineCfg(qemu_riscv64, ['spike', 'rv64', 4095]),
-            'spike32':      QemuMachineCfg(qemu_riscv32, ['spike', 'rv32', 1024]),
-            'zynq7000':     QemuMachineCfg(qemu_aarch32, ['xilinx-zynq-a9', None, 1024]),
-            'zynqmp':       QemuMachineCfg(qemu_zcu102,
-                                [
-                                    None, 4096,
-                                    os.path.join(self.run_context.resource_dir, 'zcu102_sd_card'),
-                                    self.run_context.log_dir
-                                ]),
-            'qemu-arm-virt-a15':  QemuMachineCfg(qemu_aarch32, ['virt', 'cortex-a15', 2048]),
-            'qemu-arm-virt-a53':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a53', 2048]),
-            'qemu-arm-virt-a57':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a57', 2048]),
-            'qemu-arm-virt-a72':  QemuMachineCfg(qemu_aarch64, ['virt', 'cortex-a72', 2048]),
-        }
-
-        selected_cfg = qemu_cfgs.get(self.run_context.platform, None)
-        qemu = selected_cfg.create_qemu()
-
-        assert(qemu is not None)
+        #qemu.config['singlestep'] = True
+        #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
+        #qemu.add_params('-d', 'in_asm') # logged to stderr
+        #qemu.add_params('-D', 'qemu_log.txt')
 
         if self.run_context.platform in ['hifive', 'migv_qemu']:
-            qemu.bios = self.run_context.system_image
+            qemu.config['bios'] = self.run_context.system_image
         else:
             # Seems older QEMU versions do not support the 'bios' parameter, so
             # we can't use
             #   qemu.bios = self.run_context.system_image
             # and have to stick to loading a kernel
-            qemu.kernel = self.run_context.system_image
-
-        # if self.run_context.platform in ['hifive']:
-        #     # The platform has 1x E51 and 4x U54. In QEMU, the E51 and one U54
-        #     # always exist, setting qemu.cores = 3,4,5 can be used to activate
-        #     # additional U54 cores.
-        #     qemu.cores = 5
-
-        #qemu.singlestep = True
-        #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
-        #qemu.add_params('-d', 'in_asm') # logged to stderr
-        #qemu.add_params('-D', 'qemu_log.txt')
+            qemu.config['kernel'] = self.run_context.system_image
 
         # Serial port usage is platform specific. On platforms with one serial
         # port only, this one is used for syslog. If there are multiple UARTs,
@@ -791,7 +954,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                                                        'zynq7000',
                                                        'zynqmp',
                                                        'hifive'])
-        assert(0 == len(qemu.serial_ports))
+        assert(0 == len(qemu.config['serial_ports']))
         if not has_syslog_on_uart_1:
             # UART 0 is syslog
             qemu.sys_log_setup(
@@ -809,7 +972,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             qemu.add_serial_port('null')
 
         if has_syslog_on_uart_1:
-            assert(1 == len(qemu.serial_ports))
+            assert(1 == len(qemu.config['serial_ports']))
             # UART 1 is syslog
             qemu.sys_log_setup(
                 self.system_log_file.name,
@@ -822,49 +985,30 @@ class QemuProxyRunner(board_automation.System_Runner):
             # the proxy)
             qemu.add_dev_nic_tap('tap2')
 
-        elif qemu.machine == 'virt':
+        elif qemu.config['machine'] == 'virt':
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
             # ToDo: check virt platform of other architectures
-            assert(qemu.cpu.startswith('cortex-a'))
+            assert(qemu.config['cpu'].startswith('cortex-a'))
             qemu.add_dev_nic_none()
 
-        # Running test on the zynqmp requires 2 QEMU instances and passing
-        # additional parameters, we create an SD card with the OS image
+        # SD Card setup,
         if self.run_context.platform == 'zynqmp':
-            # Since we are booting from the SD card the kernel image is not
-            # passed directly
-            qemu.kernel = None
-
-            # Create an SD image that contains the system binary, which will
-            # be booted by U-Boot
-            sd_card_image = self.get_log_file_fqn('sdcard1.img')
-            tools.create_sd_img(sd_card_image,
-                                128*1024*1024, # 128 MB
-                                [(self.run_context.system_image, 'os_image.elf')])
-            qemu.add_sdcard_from_image(sd_card_image)
-
-            # Initializing the MicroBlaze based PMU QEMU instance
-            qemu_pmu_instance = qemu_microblaze(None, None,
-                                                os.path.join(
-                                                    self.run_context.resource_dir,
-                                                    'zcu102_sd_card'),
-                                                self.run_context.log_dir)
-
-            # Starting the MicroBlaze based PMU QEMU instance
-            self.process_qemu_pmu_instance = qemu_pmu_instance.start(
-                        log_file_stdout = self.get_log_file_fqn('qemu_pmu_out.txt'),
-                        log_file_stderr = self.get_log_file_fqn('qemu_pmu_err.txt'),
-                        printer = self.get_printer(),
-                        print_log = print_log
-                    )
+            # QEMU boots from a SD card, so the image must be set up. And there
+            # are 2 QEMU instances actually, thus some more setup is needed.
+            qemu.setup(
+                os.path.join(
+                    self.run_context.resource_dir,
+                    'zcu102_sd_card'),
+                self.run_context.log_dir)
         elif self.sd_card_size and (self.sd_card_size > 0):
             # SD card (might be ignored if target does not support this)
-            if (qemu.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
-                self.print(f'QEMU: ignoring SD card image, not supported for {qemu.machine}')
+            machine = qemu.config['machine']
+            if (machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
+                self.print(f'QEMU: ignoring SD card image, not supported for {machine}')
             else:
-                sd_card_image = self.get_log_file_fqn('sdcard1.img')
+                sd_card_image = os.path.join(self.run_context.log_dir, 'sdcard1.img')
                 # ToDo: maybe we should create a copy here and not
                 #       modify the original file...
                 with open(sd_card_image, 'wb') as f:
