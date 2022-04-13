@@ -294,7 +294,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.additional_params = additional_params
 
         # attach to QEMU UART via TCP bridge
-        self.bridge = TcpBridge(self.run_context.printer)
+        self.bridge = TcpBridge(printer=self.get_printer())
 
         self.process_qemu = None
         self.process_proxy = None
@@ -309,6 +309,22 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         self.qemu_uart_log_host     = 'localhost'
         self.qemu_uart_log_port     = base_port + 2
+
+
+    #---------------------------------------------------------------------------
+    def get_printer(self):
+        if not self.run_context:
+            return None
+
+        return self.run_context.printer
+
+
+    #---------------------------------------------------------------------------
+    def print(self, msg):
+        printer = self.get_printer()
+        if printer:
+            printer.print(msg)
+
 
     #---------------------------------------------------------------------------
     def is_qemu_running(self):
@@ -838,16 +854,14 @@ class QemuProxyRunner(board_automation.System_Runner):
             self.process_qemu_pmu_instance = qemu_pmu_instance.start(
                         log_file_stdout = self.get_log_file_fqn('qemu_pmu_out.txt'),
                         log_file_stderr = self.get_log_file_fqn('qemu_pmu_err.txt'),
-                        printer = self.run_context.printer,
+                        printer = self.get_printer(),
                         print_log = print_log
                     )
         elif self.sd_card_size and (self.sd_card_size > 0):
             # SD card (might be ignored if target does not support this)
             if (qemu.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
-                if self.run_context.printer:
-                    self.run_context.printer.print(
-                        'QEMU: ignoring SD card image, not supported for {}'.format(
-                            qemu.machine))
+                self.print('QEMU: ignoring SD card image, not supported for {}'.format(
+                           qemu.machine))
             else:
                 sd_card_image = self.get_log_file_fqn('sdcard1.img')
                 # ToDo: maybe we should create a copy here and not
@@ -861,7 +875,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                                 log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
                                 log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
                                 additional_params = self.additional_params,
-                                printer = self.run_context.printer,
+                                printer = self.get_printer(),
                                 print_log = print_log
                             )
 
@@ -873,7 +887,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             # if nothing is logged or it may not happen at all if nothing is
             # logged.
             self.system_log_file.start_monitor(
-                printer = self.run_context.printer,
+                printer = self.get_printer(),
                 timeout = Timeout_Checker.infinite(),
                 checker_func = lambda: self.is_qemu_running()
             )
@@ -933,7 +947,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                                 cmd_arr,
                                 log_file_stdout = self.get_log_file_fqn('proxy_out.txt'),
                                 log_file_stderr = self.get_log_file_fqn('proxy_err.txt'),
-                                printer = self.run_context.printer,
+                                printer = self.get_printer(),
                                 name = 'Proxy'
                              )
 
