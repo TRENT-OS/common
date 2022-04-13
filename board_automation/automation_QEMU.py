@@ -280,7 +280,7 @@ class QemuProxyRunner(board_automation.System_Runner):
     # same port. Therefore a base is established here but the port number used
     # is calculated every time an instance gets created (see code below). At the
     # moment we can consider this as a workaround. In the future we will
-    # implement a different way of communication for qemu (see SEOS-1845)
+    # implement a different way of communication for QEMU (see SEOS-1845)
     qemu_uart_network_port  = 4444
     port_cnt_lock = threading.Lock()
 
@@ -366,7 +366,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # is machine specific to load firmware. On RISC-V, 'bios' allows
                 # booting the system in M-Mode and install a custom SBI, while
                 # 'kernel' will make QEMU use an OpenSBI firmware that comes
-                # with QEMU and boot the given OS in S-Mode.
+                # with QEMU and boots the given OS in S-Mode.
                 self.bios = None
                 self.kernel = None
 
