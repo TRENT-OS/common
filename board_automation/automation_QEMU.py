@@ -49,16 +49,16 @@ class TcpBridge():
 
                 for key, mask in self.sel.select():
 
-                    #self.print('callback {} {}'.format(key, mask))
+                    #self.print(f'callback {key} {mask}')
                     callback = key.data
 
                     try:
                         callback(key.fileobj, mask)
                     except:
                         (e_type, e_value, e_tb) = sys.exc_info()
-                        print('EXCEPTION in socket recv(): {}{}'.format(
-                            ''.join(traceback.format_exception_only(e_type, e_value)),
-                            ''.join(traceback.format_tb(e_tb))))
+                        print(f'EXCEPTION in socket recv(): ' \
+                              '{"".join(traceback.format_exception_only(e_type, e_value))}' \
+                              '{"".join(traceback.format_tb(e_tb))}')
 
         tools.run_in_daemon_thread(socket_event_thread)
 
@@ -66,7 +66,7 @@ class TcpBridge():
     #---------------------------------------------------------------------------
     def print(self, msg):
         if self.printer:
-            self.printer.print('{}: {}'.format(__class__.__name__, msg))
+            self.printer.print(f'{__class__.__name__}: {msg}')
 
 
     #---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ class TcpBridge():
 
             except:
                 if not timeout or timeout.has_expired():
-                    raise Exception('could not connect to {}:{}'.format(addr, port))
+                    raise Exception(f'could not connect to {addr}:{port}')
 
             # using 250 ms here seems a good trade-off. Even if there is some
             # system load, we usually succeed after one retry. Using 100 ms
@@ -166,7 +166,7 @@ class TcpBridge():
             # quite quick or it takes some time.
             timeout.sleep(0.25)
 
-        self.print('TCP connection established to {}:{}'.format(addr, port))
+        self.print(f'TCP connection established to {addr}:{port}')
         self.socket_client = s
 
         #-----------------------------------------------------------------------
@@ -212,7 +212,7 @@ class TcpBridge():
                 return
 
             (s, addr) = sock.accept()
-            self.print('connection from {}'.format(addr))
+            self.print(f'connection from {addr}')
             self.server_socket_client = s
             self.sel.register(s, selectors.EVENT_READ, cb_read)
 
@@ -230,7 +230,7 @@ class TcpBridge():
             s.bind(peer)
         except:
             s.close()
-            raise Exception('could not create server socket on port {}'.format(port))
+            raise Exception(f'could not create server socket on port {port}')
 
         self.server_socket = s
         s.listen(0)
@@ -420,8 +420,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # order. With older versions the iteration order is random.
                 return None if arg_dict is None \
                        else ','.join([
-                            ('{}'.format(key) if value is None \
-                                else '{}={}'.format(key, value))
+                            (f'{key}' if value is None \
+                                else f'{key}={value}')
                             for (key, value) in arg_dict.items()
                        ])
 
@@ -469,7 +469,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
             #-------------------------------------------------------------------------------
             def add_sdcard_from_image(self, sd_card_image):
-                dev_id = 'sdcardimg{}'.format(self.num_sdcard_images)
+                dev_id = f'sdcardimg{self.num_sdcard_images}'
                 self.num_sdcard_images += 1
                 # Add a drive with the file and connect the SD-Card to it.
                 self.add_drive({
@@ -501,7 +501,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             def load_blob(self, address, filename, param_dict = dict()):
 
                 if not os.path.isfile(filename):
-                    raise Exception('Missing blob file: {}'.format(filename))
+                    raise Exception(f'Missing blob file: {filename}')
 
                 full_param_dict = {
                     'addr': address,
@@ -515,7 +515,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             def load_elf(self, filename, param_dict = dict()):
 
                 if not os.path.isfile(filename):
-                    raise Exception('Missing ELF file: {}'.format(filename))
+                    raise Exception(f'Missing ELF file: {filename}')
 
                 full_param_dict = {
                     'file': filename
@@ -529,7 +529,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # we are opening a 2-way TCP socket connected to the same serial
                 # device that allows the test suite to communicate with the
                 # guest during the test execution.
-                dev_id = 'chardev{}'.format(id)
+                dev_id = f'chardev{id}'
                 self.add_dev_char_socket({
                     'id': dev_id,
                     'host': host,
@@ -539,7 +539,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     'logfile': sys_log_path,
                     'signal': 'off'
                 })
-                self.add_serial_port('chardev:{}'.format(dev_id))
+                self.add_serial_port(f'chardev:{dev_id}')
 
 
             #-------------------------------------------------------------------------------
@@ -572,7 +572,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     cmd_arr += ['-smp', str(self.cores)]
 
                 if self.memory:
-                    cmd_arr += ['-m', 'size={}M'.format(self.memory)]
+                    cmd_arr += ['-m', f'size={self.memory}M']
 
                 if not self.graphic:
                     cmd_arr += ['-nographic']
@@ -613,13 +613,13 @@ class QemuProxyRunner(board_automation.System_Runner):
                         elif param[2] == self.Additional_Param_Type.BINARY_IMG:
                             self.load_blob(param[0], param[1])
                         else:
-                            printer.print('QEMU: additional parameter type {} \
-                                not supported!'.format(param[2]))
+                            printer.print(f'QEMU: additional parameter type' \
+                                           '{param[2]} not supported!')
 
                 cmd = [ self.binary ] + cmd_arr + self.params
 
                 if printer:
-                    printer.print('QEMU: {}'.format(' '.join(cmd)))
+                    printer.print(f'QEMU: {" ".join(cmd)}')
 
                 process = process_tools.ProcessWrapper(
                             cmd,
@@ -685,10 +685,10 @@ class QemuProxyRunner(board_automation.System_Runner):
                                  'arm-generic-fdt', cpu, memory)
 
                 if not os.path.isdir(res_path):
-                    raise Exception('res_path Directory {} does not exist!'.format(res_path))
+                    raise Exception(f'res_path Directory {res_path} does not exist!')
 
                 if not os.path.isdir(dev_path):
-                    raise Exception('dev_path Directory {} does not exist!'.format(dev_path))
+                    raise Exception(f'dev_path Directory {res_path} does not exist!')
 
                 dtb_f = os.path.join(res_path, 'zcu102-arm.dtb')
                 bl_elf = os.path.join(res_path, 'bl31.elf')
@@ -697,8 +697,8 @@ class QemuProxyRunner(board_automation.System_Runner):
                 if not os.path.isfile(dtb_f) or \
                     not os.path.isfile(bl_elf) or \
                     not os.path.isfile(u_boot_elf):
-                    raise Exception('The resource directory does not contain all \
-                                        necessary files to start QEMU')
+                    raise Exception('The resource directory does not contain' \
+                                    ' all necessary files to start QEMU')
 
                 self.dtb = dtb_f
                 self.load_elf(bl_elf, {'cpu-num': 0})
@@ -800,7 +800,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         if (has_data_uart):
             # UART 0 or UART 1 is used for data
-            qemu.add_serial_port('tcp:localhost:{},server'.format(self.qemu_uart_network_port))
+            qemu.add_serial_port(f'tcp:localhost:{self.qemu_uart_network_port},server')
         elif has_syslog_on_uart_1:
             # UART 0 must be a dummy in this case
             assert(0 == len(qemu.serial_ports))
@@ -860,8 +860,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         elif self.sd_card_size and (self.sd_card_size > 0):
             # SD card (might be ignored if target does not support this)
             if (qemu.machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
-                self.print('QEMU: ignoring SD card image, not supported for {}'.format(
-                           qemu.machine))
+                self.print(f'QEMU: ignoring SD card image, not supported for {qemu.machine}')
             else:
                 sd_card_image = self.get_log_file_fqn('sdcard1.img')
                 # ToDo: maybe we should create a copy here and not
@@ -926,12 +925,11 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         assert(proxy_app is not None )
         if not os.path.isfile(proxy_app):
-            raise Exception('ERROR: missing proxy app: {}'.format(proxy_app))
+            raise Exception(f'ERROR: missing proxy app: {proxy_app}')
 
         if (serial_qemu_connection != 'TCP'):
             raise Exception(
-                'ERROR: invalid Proxy/QEMU_connection mode: {}'.format(
-                    serial_qemu_connection))
+                f'ERROR: invalid Proxy/QEMU_connection mode: {serial_qemu_connectio}')
 
         # start the bridge between QEMU and the Proxy
         self.bridge.start_server(self.proxy_network_port)
@@ -939,7 +937,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # start the proxy and have it connect to the bridge
         cmd_arr = [
             proxy_app,
-            '-c', 'TCP:{}'.format(self.proxy_network_port),
+            '-c', f'TCP:{self.proxy_network_port}',
             '-t', '1' # enable TAP
         ]
 
@@ -951,9 +949,9 @@ class QemuProxyRunner(board_automation.System_Runner):
                                 name = 'Proxy'
                              )
 
-        self.print('starting Proxy: {}'.format(' '.join(cmd_arr)))
-        self.print('  proxy stdout:   {}'.format(self.process_proxy.log_file_stdout))
-        self.print('  proxy stderr:   {}'.format(self.process_proxy.log_file_stderr))
+        self.print('starting Proxy: {" ".join(cmd_arr)}')
+        self.print('  proxy stdout: {self.process_proxy.log_file_stdout}')
+        self.print('  proxy stderr: {self.process_proxy.log_file_stderr}')
 
         self.process_proxy.start(print_log)
 
