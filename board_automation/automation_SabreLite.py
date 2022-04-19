@@ -155,6 +155,14 @@ class BoardRunner():
 
         self.board.boot_internal()
 
+        #board.boot_usb_download()
+        #
+        #IMX6_USB_LOADER = '/home/axel/hensoldt/projekte/seos/_work/imx6/imx_usb_loader/imx_usb'
+        #IMX6_UBOOT = '/home/axel/hensoldt/projekte/seos/_work/imx6/u-boot-imx6/u-boot.imx'
+
+        # start in thread:
+        #   os.system('{} {}'.format(IMX6_USB_LOADER, IMX6_UBOOT))
+
 
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)

@@ -116,6 +116,10 @@ class BoardRunner():
 
         self.board.power_on()
 
+        # test reset
+        #   time.sleep(2)
+        #   self.board.reset()
+
 
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
