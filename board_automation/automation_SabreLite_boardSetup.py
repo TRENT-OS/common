@@ -20,14 +20,19 @@ class Board_Setup():
 
         self.printer = printer
 
-        self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
-        relay_board = relay_control.Relay_Board(self.gpio)
+        pins = None
 
+        if host_is_raspi:
+            self.gpio = relay_control.RasPi_GPIO()
+            pins = {'POWER': 4, 'RESET': 17, 'SW1_1': 27, 'SW1_2': 22}
+        else:
+            self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
+            pins = {'POWER': 4, 'RESET': 5, 'SW1_1': 6, 'SW1_2': 7}
+
+        relay_board = relay_control.Relay_Board(self.gpio)
         self.relay_config = relay_control.Relay_Config({
-                                'POWER': relay_board.get_relay(4),
-                                'RESET': relay_board.get_relay(5),
-                                'SW1_1': relay_board.get_relay(6),
-                                'SW1_2': relay_board.get_relay(7)
+                                key: relay_board.get_relay(idx)
+                                for key, idx in pins.items() }
                             })
 
         self.sd_wire = sd_wire.SD_Wire(
