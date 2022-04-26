@@ -62,7 +62,7 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
         #
         #  loop iteration 1:     | line part |...
         #  loop iteration 2:               | line part |...
-        #  ..
+        #  ...
         #  loop iteration k:                                | line+\n |
         #
         # There is a line break bug in some logs, "\n\r" is used instead of
@@ -83,7 +83,7 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
             if (0 == new_timeout):
                 return None
 
-            # we still have time left, so sleep a while and check again. Note
+            # We still have time left, so sleep a while and check again. Note
             # that we don't check for a timeout immediately after the sleep.
             # Rationale is, that waiting for a fixed time is useless, if we
             # know this would make us run into a timeout - we should not wait
@@ -91,7 +91,7 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
             time.sleep( min(0.5, new_timeout) )
             continue
 
-        # we have reached the end of a line, return it
+        # We have reached the end of a line, return it.
         return line
 
 
@@ -116,7 +116,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
     while True:
 
-        # timeouts apply only, when a function would block, we don't want to
+        # Timeouts apply only, when a function would block, we don't want to
         # fail if there is data, but we've run out of time. Thus we set the
         # timeout to 0 if we have run out of time, so any blocking would lead
         # to an error.
@@ -156,7 +156,7 @@ def check_log_match_sequence(f, expr_array, timeout_sec=0):
             print("No match for '%s'" % expr)
             return (False, text, expr)
 
-        # we don't support any wildcards for now
+        # We don't support any wildcards for now.
         assert(match == expr)
 
     return (True, text, None)
@@ -193,7 +193,7 @@ def check_log_match_multiple_sequences(f, seq_expr_array):
                 print('No match in sequence #{} for: {}'.format(idx, expr))
                 return (False, text, expr, idx)
 
-            # we don't support any wildcards for now
+            # We don't support any wildcards for now.
             assert(match == expr)
 
     return (True, text, None, 0)
@@ -222,7 +222,7 @@ def check_log_match_set(f, expr_array, timeout_sec=0):
 
     while True:
 
-        # timeouts apply only, when a function would block, we don't want to
+        # Timeouts apply only, when a function would block, we don't want to
         # fail if there is data, but we've run out of time. Thus we set the
         # timeout to 0 if we have run out of time, so any blocking would lead
         # to an error.
@@ -233,8 +233,8 @@ def check_log_match_set(f, expr_array, timeout_sec=0):
 
         text += line
 
-        # we can't modify the dictionary while iterating over it, thus we
-        # create a list of itmes to remove
+        # We can't modify the dictionary while iterating over it, thus we
+        # create a list of items to remove.
         remove_expr = [];
         for expr in expr_dict:
             regex_compiled = expr_dict[expr]
@@ -243,10 +243,10 @@ def check_log_match_set(f, expr_array, timeout_sec=0):
                 continue
 
             match = mo.group(0)
-            assert(match == expr) # we don't support any wildcards for now
+            assert(match == expr) # We don't support any wildcards for now.
             remove_expr.append(expr)
 
-        # remove expression we have found
+        # Remove expression we have found.
         if remove_expr:
             for expr in remove_expr:
                 expr_dict.pop(expr)

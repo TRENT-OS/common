@@ -509,7 +509,7 @@ class Log_File(object):
     @classmethod
     def do_match_multiple_sequences(cls, hLog, seq_arr, timeout = None):
         for idx, (str_arr, timeout_sec) in enumerate(seq_arr):
-            # we already have the first timeout running, for for every
+            # we already have the first timeout running, for every
             # further element we set up a new timeout
             if (idx > 0):
                 timeout = Timeout_Checker(timeout_sec)
