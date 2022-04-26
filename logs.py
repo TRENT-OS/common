@@ -112,7 +112,7 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
     regex_compiled = re.compile( regex )
     time_end = time.time() + timeout_sec
-    text    = ""
+    text = ""
 
     while True:
 
