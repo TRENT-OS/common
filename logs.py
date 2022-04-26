@@ -287,7 +287,6 @@ def check_result_or_assert(f, test_fn, test_args, timeout=0):
     result_re = re.compile(r'!!! %s: OK\n' % re.escape(test_name))
 
     stop_time = time.time() + timeout
-    line = ""
 
     while True:
         new_timeout = get_remaining_timeout_or_zero(stop_time)
@@ -302,5 +301,3 @@ def check_result_or_assert(f, test_fn, test_args, timeout=0):
         mo = assert_re.search(line)
         if mo is not None:
             return (False, mo.group(1))
-
-        line = ""
