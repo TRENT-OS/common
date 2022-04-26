@@ -7,10 +7,10 @@ performed "online" on the log until the match condition happens or a timeout
 occurred
 """
 
-import time
 import re
 import fcntl
 import os
+from board_automation import tools
 
 
 #------------------------------------------------------------------------------
@@ -37,19 +37,19 @@ def open_file_non_blocking(file_name, mode, newline=None):
 
 
 #------------------------------------------------------------------------------
-def get_remaining_timeout_or_zero(time_end):
-    time_now = time.time()
-    return 0 if (time_now >= time_end) else time_end - time_now;
-
-
-#------------------------------------------------------------------------------
-def read_line_from_log_file_with_timeout(f, timeout_sec=0):
+def read_line_from_log_file_with_timeout(f, timeout_sec=None):
     """
-    Read a line from a logfile with a timeout. If the timeout is 0, it is
+    Read a line from a logfile with a timeout. If the timeout is None, it is
     disabled. The file handle must be opened in non-blocking mode.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
     """
 
-    time_end = time.time() + timeout_sec
+    timeout = tools.Timeout_Checker(timeout_sec)
     line = ""
 
     while True:
@@ -79,8 +79,7 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
             # some timeout. If a root test executor is really concerned about
             # tests running too long, it must setup a separate watchdog that
             # simply kills the test.
-            new_timeout = get_remaining_timeout_or_zero(time_end)
-            if (0 == new_timeout):
+            if timeout.has_expired():
                 return None
 
             # We still have time left, so sleep a while and check again. Note
@@ -88,7 +87,7 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
             # Rationale is, that waiting for a fixed time is useless, if we
             # know this would make us run into a timeout - we should not wait
             # at all in this case.
-            time.sleep( min(0.5, new_timeout) )
+            timeout.sleep(0.5)
             continue
 
         # We have reached the end of a line, return it.
@@ -96,32 +95,32 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=0):
 
 
 #------------------------------------------------------------------------------
-def get_match_in_line(f, regex, timeout_sec=0):
+def get_match_in_line(f, regex, timeout_sec=None):
     """
     Gets the first regex match in a text file parsing it line by line.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
 
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
     regex(Pattern): a compiled regular expression to look for
-    timeout_sec(int, optional): timeout in seconds, 0 means disabled
+    timeout_sec(optional): timeout in seconds, None means disabled
 
     Returns:
     text(str): the text from the begin of the search until the first match or the end
     match(str): the matching string
     """
 
+    timeout = tools.Timeout_Checker(timeout_sec)
     regex_compiled = re.compile( regex )
-    time_end = time.time() + timeout_sec
     text = ""
 
     while True:
-
-        # Timeouts apply only, when a function would block, we don't want to
-        # fail if there is data, but we've run out of time. Thus we set the
-        # timeout to 0 if we have run out of time, so any blocking would lead
-        # to an error.
-        new_timeout = get_remaining_timeout_or_zero(time_end)
-        line = read_line_from_log_file_with_timeout(f, new_timeout)
+        line = read_line_from_log_file_with_timeout(f, timeout)
         if line is None:
             return (text, None)
 
@@ -132,25 +131,29 @@ def get_match_in_line(f, regex, timeout_sec=0):
 
 
 #-------------------------------------------------------------------------------
-def check_log_match_sequence(f, expr_array, timeout_sec=0):
+def check_log_match_sequence(f, expr_array, timeout_sec=None):
     """
     Takes an array of regular expressions and perform the simple test. The
     order of the elements in the array matters, must be the same order in the
-    log file
+    log file.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
 
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
     expr_array: array with strings to match
-    timeout_sec(int, optional): timeout in seconds, 0 means disabled
+    timeout_sec(optional): timeout in seconds, None means disabled
     """
 
+    timeout = tools.Timeout_Checker(timeout_sec)
     text = ""
-    time_end = time.time() + timeout_sec
 
     for expr in expr_array:
-
-        new_timeout = get_remaining_timeout_or_zero(time_end)
-        (text_part, match) = get_match_in_line(f, re.escape(expr), new_timeout)
+        (text_part, match) = get_match_in_line(f, re.escape(expr), timeout)
         text += text_part
         if match is None:
             print("No match for '%s'" % expr)
@@ -167,7 +170,13 @@ def check_log_match_multiple_sequences(f, seq_expr_array):
     """
     Takes an array of tupels, each holding a timeout and sequence of regular
     expressions to match withing this timeout in the given order. Calls
-    check_log_match_sequence() for each tupel
+    check_log_match_sequence() for each tupel.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
 
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
@@ -178,16 +187,14 @@ def check_log_match_multiple_sequences(f, seq_expr_array):
 
     for idx, (expr_array, timeout_sec) in enumerate(seq_expr_array):
 
-        time_end = time.time() + timeout_sec
+        timeout = tools.Timeout_Checker(timeout_sec)
 
         for expr in expr_array:
-
-            timeout_sec = get_remaining_timeout_or_zero(time_end)
 
             (text_part, match) = get_match_in_line(
                                     f,
                                     re.escape(expr),
-                                    timeout_sec)
+                                    timeout)
             text += text_part
             if match is None:
                 print('No match in sequence #{} for: {}'.format(idx, expr))
@@ -200,34 +207,35 @@ def check_log_match_multiple_sequences(f, seq_expr_array):
 
 
 #-------------------------------------------------------------------------------
-def check_log_match_set(f, expr_array, timeout_sec=0):
+def check_log_match_set(f, expr_array, timeout_sec=None):
     """
     Take an array of regular expressions and perform the simple test. The order
     of the elements in the array does not matter, the matches just have to be
     there in the log occurring at any time at the least once per single
-    expression
+    expression.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
 
     Args:
     f(file): the file handler of the log (shall be opened for non-blocking op)
     expr_array: array with strings to match
-    timeout_sec(int, optional): timeout in seconds, 0 means disabled
+    timeout_sec(optional): timeout in seconds, None means disabled
     """
+
+    timeout = tools.Timeout_Checker(timeout_sec)
 
     expr_dict = {}
     for expr in expr_array:
         expr_dict[expr] = re.compile( re.escape(expr) )
 
     text = ""
-    time_end = time.time() + timeout_sec
 
     while True:
-
-        # Timeouts apply only, when a function would block, we don't want to
-        # fail if there is data, but we've run out of time. Thus we set the
-        # timeout to 0 if we have run out of time, so any blocking would lead
-        # to an error.
-        new_timeout = get_remaining_timeout_or_zero(time_end)
-        line = read_line_from_log_file_with_timeout(f, new_timeout)
+        line = read_line_from_log_file_with_timeout(f, timeout)
         if line is None:
             return (False, text, expr_dict.keys())
 
@@ -266,7 +274,8 @@ def find_assert(f):
 
     f.seek(0,0)
 
-    (text, match) = get_match_in_line(f, assert_re)
+    # set timeout to 0 because we just check the existing log for asserts
+    (text, match) = get_match_in_line(f, assert_re, 0)
 
     f.seek(0,0)
 
@@ -274,11 +283,19 @@ def find_assert(f):
 
 
 #-------------------------------------------------------------------------------
-def check_result_or_assert(f, test_fn, test_args, timeout=0):
+def check_result_or_assert(f, test_fn, test_args, timeout_sec=None):
     """
     Wait for a test result string or an assert specific to a test function
     appears in the output file.
+    Any timeout applies only when the function would block after all available
+    log data has been processed. As long as log data is available, it gets
+    processed, even if the timeout has actually expired already. Rationale is,
+    that it is assumed log data can be processed faster than it gets produced.
+    The purpose of this timeout is not to be a global timeout for the test
+    run, but just a limit how long to wait for new data.
     """
+
+    timeout = tools.Timeout_Checker(timeout_sec)
 
     test_name = test_fn if test_args is None \
                 else "%s(%s)" % (test_fn, test_args)
@@ -286,11 +303,8 @@ def check_result_or_assert(f, test_fn, test_args, timeout=0):
     assert_re = re.compile(r'Assertion failed: @%s: (.*)\n' % re.escape(test_name))
     result_re = re.compile(r'!!! %s: OK\n' % re.escape(test_name))
 
-    stop_time = time.time() + timeout
-
     while True:
-        new_timeout = get_remaining_timeout_or_zero(stop_time)
-        line = read_line_from_log_file_with_timeout(f, new_timeout)
+        line = read_line_from_log_file_with_timeout(f, timeout)
         if line is None:
             return (False, None)
 
