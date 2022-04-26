@@ -342,9 +342,9 @@ class Timeout_Checker(object):
             raise Exception('can''t sleep() for an infinite time')
 
         # get the timeout, sleep only if it has not already expired
-        timeout = sub_timeout.get_remaining()
-        if (0 != timeout):
-            time.sleep(timeout)
+        timeout_sec = sub_timeout.get_remaining()
+        if (0 != timeout_sec):
+            time.sleep(timeout_sec)
 
 
 #===============================================================================
