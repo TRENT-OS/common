@@ -69,29 +69,23 @@ def read_line_from_log_file_with_timeout(f, timeout_sec=None):
         # "\r\n". Universal newline handling accepts "\r", "\n" and "\r\n" as
         # line break. We end up with some empty lines then as "\n\r" is taken
         # as two line breaks.
+        data = f.readline()
+        line += data
+        if line.endswith("\n"):
+            return line
 
-        line += f.readline()
-        if not line.endswith("\n"):
-            # We consider timeouts only if we have to block. As long as there
-            # is no blocking operation, we don't care about the timeouts. The
-            # rational is, that processing the log could be slow, but all data
-            # is in the logs already. We don't want to fail just because we hit
-            # some timeout. If a root test executor is really concerned about
-            # tests running too long, it must setup a separate watchdog that
-            # simply kills the test.
-            if timeout.has_expired():
-                return None
+        is_fragment = (len(line) > 0)
 
-            # We still have time left, so sleep a while and check again. Note
-            # that we don't check for a timeout immediately after the sleep.
-            # Rationale is, that waiting for a fixed time is useless, if we
-            # know this would make us run into a timeout - we should not wait
-            # at all in this case.
-            timeout.sleep(0.5)
-            continue
+        if timeout.has_expired():
+            # Fake a newline character if there was data.
+            return (line + "\n") if is_fragment else None
 
-        # We have reached the end of a line, return it.
-        return line
+        # Sleep and check again. This will sleep less than the requested time
+        # if the timeout has not enough time left. If there was at least some
+        # data, we might have been unlucky and just read while a line is about
+        # to be appended. Wait just 100ms in this case, otherwise wait 500ms
+        # because it seems we are really blocked waiting on new data to arrive.
+        timeout.sleep(0.1 if is_fragment else 0.5)
 
 
 #------------------------------------------------------------------------------
