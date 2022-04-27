@@ -271,16 +271,35 @@ def find_assert(f):
     """
 
     assert_re = re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)\n')
+    ret = None
 
-    f.seek(0,0)
+    # check the whole log received so far
+    f.seek(0)
 
-    # set timeout to 0 because we just check the existing log for asserts
-    (text, match) = get_match_in_line(f, assert_re, 0)
+    read_next_line = True
 
-    f.seek(0,0)
+    while read_next_line:
 
-    return match
+        line = f.readline()
+        # Lines end with a newline character (\n) unless it's the last line
+        # and the file doesn't end with a newline. This makes the return value
+        # unambiguous, if line is an empty string, the end of the file has been
+        # reached, any blank lines are represented by string containing only a
+        # single newline char.
+        if not line.endswith("\n"):
+            read_next_line = False
+            line += "\n" # assert_re still expects a newline char
 
+        mo = assert_re.search(line)
+        if mo:
+            ret = mo.group(0)
+            read_next_line = False
+
+
+    f.seek(0)
+
+    # return match on None
+    return ret
 
 #-------------------------------------------------------------------------------
 def check_result_or_assert(f, test_fn, test_args, timeout_sec=None):
