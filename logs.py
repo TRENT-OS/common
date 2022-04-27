@@ -270,7 +270,7 @@ def find_assert(f):
     Start at the beginning and ensure that we set the file cursor back.
     """
 
-    assert_re = re.compile(r'Assertion failed: \@(.*)\((.*)\): (.*)\n')
+    assert_re = re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)\n')
 
     f.seek(0,0)
 
