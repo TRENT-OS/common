@@ -794,7 +794,7 @@ def get_qemu(target, printer=None):
                 'gic-version':    '2',
             }],
             'cpu':      'cortex-a53',
-            'memory':   2048,
+            'memory':   3072,
         },
         'qemu-arm-virt-a57': {
             'qemu-bin': 'qemu-system-aarch64',
