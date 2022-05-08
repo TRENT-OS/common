@@ -41,7 +41,7 @@ class FTDI_CBUS_GPIO:
 
     #---------------------------------------------------------------------------
     def read(self):
-        return self.ftdi.get_cbus_gpio(mask)
+        return self.ftdi.get_cbus_gpio()
 
 
 #===============================================================================
