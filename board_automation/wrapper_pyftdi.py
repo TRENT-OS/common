@@ -8,7 +8,9 @@ from . import tools
 # pyftdi needs pyusb
 tools.add_subdir_to_sys_path(__file__, 'pyusb')
 tools.add_subdir_to_sys_path(__file__, 'pyftdi')
-from pyftdi import gpio, ftdi
+import pyftdi
+import pyftdi.ftdi
+import pyftdi.gpio
 
 #===============================================================================
 #===============================================================================
@@ -18,7 +20,7 @@ class FTDI_CBUS_GPIO:
     #---------------------------------------------------------------------------
     def __init__(self, url):
 
-        self.ftdi = ftdi.Ftdi()
+        self.ftdi = pyftdi.ftdi.Ftdi()
 
         self.ftdi.open_from_url(url)
 
@@ -79,10 +81,10 @@ def list_devices(vid = 0x0403):
 def get_pyftdi_gpio(url):
 
     list_devices()
-    ftdi.Ftdi.show_devices()
+    pyftdi.ftdi.Ftdi.show_devices()
 
     print(f'opening {url}')
-    gpio_contoller = gpio.GpioAsyncController()
+    gpio_contoller = pyftdi.gpio.GpioAsyncController()
     gpio_contoller.configure(url, direction=0xFF)
 
     return gpio_contoller
