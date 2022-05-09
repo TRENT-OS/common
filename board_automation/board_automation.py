@@ -131,7 +131,7 @@ class System_Runner(object):
         if boot_mode == BootMode.BARE_METAL:
             return
 
-        (ret , idx, idx2) = self.system_log_match_multiple_sequences([
+        (ret, idx, idx2) = self.system_log_match_multiple_sequences([
 
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
@@ -154,7 +154,7 @@ class System_Runner(object):
         if boot_mode == BootMode.SEL4_NATIVE:
             return
 
-        (ret , idx, idx2) = self.system_log_match_multiple_sequences([
+        (ret, idx, idx2) = self.system_log_match_multiple_sequences([
 
             # the CapDL Loader runs a as root task. It should run immediately,
             # so 2 secs should do.
