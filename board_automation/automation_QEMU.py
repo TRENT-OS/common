@@ -56,9 +56,9 @@ class TcpBridge():
                         callback(key.fileobj, mask)
                     except:
                         (e_type, e_value, e_tb) = sys.exc_info()
-                        print(f'EXCEPTION in socket recv(): ' \
-                              '{"".join(traceback.format_exception_only(e_type, e_value))}' \
-                              '{"".join(traceback.format_tb(e_tb))}')
+                        self.print(f'EXCEPTION in socket recv(): ' \
+                                   '{"".join(traceback.format_exception_only(e_type, e_value))}' \
+                                   '{"".join(traceback.format_tb(e_tb))}')
 
         tools.run_in_daemon_thread(socket_event_thread)
 
