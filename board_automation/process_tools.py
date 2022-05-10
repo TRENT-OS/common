@@ -208,7 +208,7 @@ class ProcessWrapper:
             def thread_stdout(thread):
                 self.monitor_channel(
                     self.process.stdout,
-                    self.name,
+                    self.name + '/stdout',
                     print_log,
                     self.log_file_stdout)
             tools.run_in_thread(thread_stdout)
@@ -217,7 +217,7 @@ class ProcessWrapper:
             def thread_stderr(thread):
                 self.monitor_channel(
                     self.process.stderr,
-                    self.name + '/E',
+                    self.name + '/stderr',
                     print_log,
                     self.log_file_stderr)
             tools.run_in_thread(thread_stderr)
