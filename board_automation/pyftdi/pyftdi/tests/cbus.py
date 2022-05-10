@@ -62,6 +62,8 @@ class CbusGpioTestCase(TestCase):
         eeprom = FtdiEeprom()
         eeprom.connect(ftdi)
         # sanity check: device should have been configured for CBUS GPIOs
+        print(eeprom.cbus_pins)
+        print(eeprom.cbus_mask)
         self.assertEqual(eeprom.cbus_mask & 0b1001, 0b1001)
         # configure CBUS0 and CBUS3 as output
         ftdi.set_cbus_direction(0b1001, 0b1001)
