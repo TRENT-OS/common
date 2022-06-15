@@ -872,13 +872,16 @@ class QemuProxyRunner(board_automation.System_Runner):
                 qemu.add_sdcard_from_image(sd_card_image)
 
         # start QEMU
-        self.process_qemu = qemu.start(
-                                log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
-                                log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
-                                additional_params = self.additional_params,
-                                printer = self.get_printer(),
-                                print_log = print_log
-                            )
+        qemu_proc = qemu.start(
+                        log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
+                        log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
+                        additional_params = self.additional_params,
+                        printer = self.get_printer(),
+                        print_log = print_log)
+
+        if not qemu_proc:
+            raise Exception('could not start QEMU')
+        self.process_qemu = qemu_proc
 
         if print_log:
             # now that a QEMU process exists, start the monitor thread. The
