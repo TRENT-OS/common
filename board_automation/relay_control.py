@@ -200,12 +200,12 @@ class Relay_Board:
     Operation mode 1: relays are driven from I/O line
        Connect VCC and GND to the IO controller board.
 
-    Operation mode 2: relays are driver vom I/O board power source
+    Operation mode 2: relays are driven from I/O board power source
       remove the jumper between JD-VCC and VCC. Connect VCC to the I/O
       controller's I/O power and JD-VCC to the power source of the I/O controller
       board. Connect GND to the I/O controllers GND
 
-    Operation mode 2: galvanic isolation of I/Os:
+    Operation mode 3: galvanic isolation of I/Os:
       remove jumper between VCC and JD-VCC. Connect JD-VCC and GND to a
       separate power source. Connect VCC to the I/O board's VCC
 
