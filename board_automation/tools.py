@@ -162,40 +162,43 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
             os.path.join('::/', item[1])])
 
 
-#-------------------------------------------------------------------------------
-# this is just a convenience function wrapping threading.Thread that can be
-# used to run a function in a thread. It's use as
+#===============================================================================
+#===============================================================================
+class MyThread(threading.Thread):
+# This is a convenience wrapper class for using threads. It reports exceptions
+# in the thread's main function that would otherwise get lost. Note that Python
+# recommends using daemon threads, because many common use case are basically
+# starting worker threads that can be killed when the application terminated.
+# Use cases for non-daemon threads are more rare, but they allow better control
+# to do proper cleanup and shutdown.
 #
-#   import tools
-#   ...
-#   def some_method(self, params):
-#      ...
-#      def my_thread(thread):
-#          self.do_something_special(params)
-#
-#      self.thread = tools.run_in_thread(my_thread)
-#
-# instead of doing
+# The manual way with threads is:
 #
 #   import threading
 #   ...
 #   def some_method(self, params):
 #      ...
 #      def my_thread():
-#          self.do_something_special(params)
+#          do_something_special(...)
 #
+#      thread = threading.Thread(target = my_thread, daemon = True)
+#      thread.start()
 #
-#      self.thread = threading.Thread(target = my_thread)
-#      self.thread.start()
+# With this wrapper it becomes:
 #
-
-#===============================================================================
-#===============================================================================
-class MyThread(threading.Thread):
+#   import tools
+#   ...
+#   def some_method(self, params):
+#      ...
+#      def my_thread(thread):
+#          self.do_something_special(...)
+#
+#      thread = tools.run_in_thread(my_thread)
+#
 
     #---------------------------------------------------------------------------
-    def __init__(self, func, daemon=None):
-        super().__init__(daemon=daemon)
+    def __init__(self, func, isDaemon=True):
+        super().__init__(daemon=isDaemon)
         self.func = func
 
 
@@ -217,14 +220,8 @@ class MyThread(threading.Thread):
 
 
 #-------------------------------------------------------------------------------
-def run_in_thread(func):
-    t = MyThread(func)
-    t.start()
-    return t
-
-#-------------------------------------------------------------------------------
-def run_in_daemon_thread(func):
-    t = MyThread(func, daemon=True)
+def run_in_thread(func, isDaemon=True):
+    t = MyThread(func, isDaemon)
     t.start()
     return t
 

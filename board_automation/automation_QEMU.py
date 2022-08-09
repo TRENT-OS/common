@@ -61,7 +61,7 @@ class TcpBridge():
                                    '\nCall stack:\n' +
                                    ''.join(traceback.format_tb(e_tb)))
 
-        tools.run_in_daemon_thread(socket_event_thread)
+        tools.run_in_thread(socket_event_thread)
 
 
     #---------------------------------------------------------------------------
