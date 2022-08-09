@@ -166,11 +166,12 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
 #===============================================================================
 class MyThread(threading.Thread):
 # This is a convenience wrapper class for using threads. It reports exceptions
-# in the thread's main function that would otherwise get lost. Note that Python
-# recommends using daemon threads, because many common use case are basically
-# starting worker threads that can be killed when the application terminated.
-# Use cases for non-daemon threads are more rare, but they allow better control
-# to do proper cleanup and shutdown.
+# in the thread's main function that would otherwise get lost. Forthermore it
+# allows passing a context to the thread.
+# Python recommends using daemon threads, because many common use case are
+# basically starting worker threads that can be killed when the application
+# terminated. Use cases for non-deamon threads are more rare, but they allow
+# better control to do proper cleanup and shutdown.
 #
 # The manual way with threads is:
 #
@@ -188,18 +189,21 @@ class MyThread(threading.Thread):
 #
 #   import tools
 #   ...
-#   def some_method(self, params):
+#   def some_method(self, params, ctx):
+#      ...
+#      my_context = ...
 #      ...
 #      def my_thread(thread):
+#          the_ctx = thread.ctx
 #          self.do_something_special(...)
 #
-#      thread = tools.run_in_thread(my_thread)
-#
+#      thread = tools.run_in_thread(my_thread, ctx)
 
     #---------------------------------------------------------------------------
-    def __init__(self, func, isDaemon=True):
+    def __init__(self, func, ctx=None, isDaemon=None):
         super().__init__(daemon=isDaemon)
-        self.func = func
+        self._func = func
+        self.ctx  = ctx
 
 
     #---------------------------------------------------------------------------
@@ -210,7 +214,11 @@ class MyThread(threading.Thread):
     #---------------------------------------------------------------------------
     def run(self):
         try:
-            self.func(self)
+            # ToDo: could use inspect.signature(self._func) to find out how
+            #       man parameters the function can take and then choose between
+            #       calling self._func() or self._func(self) or
+            #       self._func(self, self.ctx) for further convenience.
+            self._func(self)
         except: # catch really *all* exceptions
             (e_type, e_value, e_tb) = sys.exc_info()
             print('EXCEPTION in thread {}: {}{}'.format(
@@ -220,8 +228,8 @@ class MyThread(threading.Thread):
 
 
 #-------------------------------------------------------------------------------
-def run_in_thread(func, isDaemon=True):
-    t = MyThread(func, isDaemon)
+def run_in_thread(func, ctx=None, isDaemon=True):
+    t = MyThread(func, ctx=ctx, isDaemon=isDaemon)
     t.start()
     return t
 
