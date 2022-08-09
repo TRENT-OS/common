@@ -208,7 +208,7 @@ class MyThread(threading.Thread):
 
     #---------------------------------------------------------------------------
     def __str__(self):
-        return '{}/{}()'.format(self.name, self.func.__name__)
+        return f'{self.name}/{self._func.__name__}()'
 
 
     #---------------------------------------------------------------------------
@@ -221,10 +221,9 @@ class MyThread(threading.Thread):
             self._func(self)
         except: # catch really *all* exceptions
             (e_type, e_value, e_tb) = sys.exc_info()
-            print('EXCEPTION in thread {}: {}{}'.format(
-                self,
-                ''.join(traceback.format_exception_only(e_type, e_value)),
-                ''.join(traceback.format_tb(e_tb))))
+            print(f'EXCEPTION in thread {self}: ' +
+                  ''.join(traceback.format_exception_only(e_type, e_value)) +
+                  ''.join(traceback.format_tb(e_tb)))
 
 
 #-------------------------------------------------------------------------------
