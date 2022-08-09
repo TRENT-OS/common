@@ -235,6 +235,7 @@ class ProcessWrapper:
 
     #---------------------------------------------------------------------------
     def terminate(self):
-        if self.process is not None:
-            self.process.terminate()
+        p = self.process
+        if p is not None:
+            p.terminate()
             self.process = None
