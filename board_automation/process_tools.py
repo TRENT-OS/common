@@ -213,7 +213,7 @@ class ProcessWrapper:
                     self.log_file_stdout)
             tools.run_in_thread(thread_stdout)
 
-        if has_stdout:
+        if has_stderr:
             def thread_stderr(thread):
                 self.monitor_channel(
                     self.process.stderr,
