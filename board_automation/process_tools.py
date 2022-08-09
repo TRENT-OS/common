@@ -106,8 +106,8 @@ class ProcessWrapper:
     def is_running(self):
         try:
 
-            s = self.process
-            return (s is not None) and (s.poll() is None)
+            p = self.process
+            return (p is not None) and (p.poll() is None)
 
         except Exception as e:
 
