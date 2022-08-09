@@ -119,71 +119,6 @@ class ProcessWrapper:
 
 
     #---------------------------------------------------------------------------
-    def monitor_channel_loop(
-        self,
-        h_in,
-        name,
-        print_log = False,
-        f_log = None):
-
-        start = datetime.datetime.now()
-
-        while (True):
-
-            if not self.process:
-                # seems the process got terminated
-                return
-
-            ret = self.process.poll()
-            if (ret is not None):
-                msg = '{}: termination, code {}'.format(name, ret)
-                self.print(msg)
-                return
-
-            line = h_in.readline()
-            if (len(line) == 0):
-                # readline() can have a timeout
-                continue
-
-            line_str = line.decode('utf-8')
-            line_str = line_str.replace('\b', '<BACKSPACE>')
-
-            if f_log:
-                f_log.write(line_str)
-                f_log.write(os.linesep)
-                f_log.flush() # ensure things are really written
-
-            if print_log:
-                delta = datetime.datetime.now() - start;
-                # timestamp = datetime.datetime(delta.total_seconds()).strftime("%H%:M:%S.%f")
-                # msg = '[{} {}] {}'.format(timestamp[:-3], name, line_str)
-                msg = '[{} {}] {}'.format(delta, name, line_str)
-                self.print(msg)
-
-
-    #---------------------------------------------------------------------------
-    def monitor_channel(
-        self,
-        h_in,
-        name,
-        print_log = False,
-        filename = None):
-
-        try:
-            if not filename:
-                self.monitor_channel_loop(h_in, name, print_log)
-
-            else:
-                with open(filename, "w") as f_log:
-                    self.monitor_channel_loop(h_in, name, print_log, f_log)
-
-        except Exception as e:
-            exc_info = sys.exc_info()
-            self.print('Exception for {}: {}'.format(self, e))
-            traceback.print_exception(*exc_info)
-
-
-    #---------------------------------------------------------------------------
     def start(
         self,
         has_stdin = False,
@@ -193,44 +128,87 @@ class ProcessWrapper:
         # process must not be running
         assert(self.process is None)
 
-        has_stdout = print_log or (self.log_file_stdout is not None)
-        has_stderr = print_log or (self.log_file_stderr is not None)
-
         self.process = subprocess.Popen(
                             self.cmd_arr,
                             env = None,
                             stdin = subprocess.PIPE if has_stdin else None,
-                            stdout = subprocess.PIPE if has_stdout else None,
-                            stderr = subprocess.PIPE if has_stderr else None
+                            stdout = subprocess.PIPE if (print_log or (self.log_file_stdout is not None)) \
+                                     else None,
+                            stderr = subprocess.PIPE if (print_log or (self.log_file_stderr is not None)) \
+                                     else None
                        )
 
-        if has_stdout:
-            def thread_stdout(thread):
-                self.monitor_channel(
-                    self.process.stdout,
-                    self.name + '/stdout',
-                    print_log,
-                    self.log_file_stdout)
-            tools.run_in_thread(thread_stdout)
+        # Wrapper function for the actual monitoring. It is running in a daemon
+        # thread that gets terminated automatically when the main thread dies.
+        def monitor_channel_loop(
+            process_wrapper,
+            h_stream,
+            name,
+            printer = None,
+            logfile_name = None):
 
-        if has_stderr:
-            def thread_stderr(thread):
-                self.monitor_channel(
+            assert(process_wrapper)
+            assert(h_stream)
+
+            t_start = datetime.datetime.now()
+            while (process_wrapper.is_running()):
+
+                # Block reading a line. Seems in some cases readline() can run into
+                # a timeout and return nothing. Or maybe the process has termiated.
+                line = h_stream.readline()
+                if (len(line) == 0):
+                    continue
+
+                line_str = line.decode('utf-8')
+                line_str = line_str.replace('\b', '<BACKSPACE>')
+
+                delta = datetime.datetime.now() - t_start;
+                # timestamp = datetime.datetime(delta.total_seconds()).strftime("%H%:M:%S.%f")
+                # msg = '[{} {}] {}'.format(timestamp[:-3], name, line_str)
+
+                # Log to the printer fist, as this is expected to work without
+                # issues.
+                if printer:
+                    printer.print(f'[{delta} {name}] {line_str}')
+
+                # Log to a file. This might into an error in the worst case, so
+                # this could be improved with some exception catching one day.
+                if logfile_name:
+                    with open(logfile_name, "a") as f:
+                        f.write(f'[{delta}] {line_str}{os.linesep}')
+                        f.flush() # ensure things are really written
+
+
+        if self.process.stdout:
+            tools.run_in_thread(
+                lambda thread: monitor_channel_loop(
+                    self,
+                    self.process.stdout,
+                    f'{self.name}/stdout',
+                    self.printer if (print_log) else None,
+                    self.log_file_stdout
+                )
+            )
+
+        if self.process.stderr:
+            tools.run_in_thread(
+                lambda thread: monitor_channel_loop(
+                    self,
                     self.process.stderr,
-                    self.name + '/stderr',
-                    print_log,
-                    self.log_file_stderr)
-            tools.run_in_thread(thread_stderr)
+                    f'{self.name}/stderr',
+                    self.printer if (print_log) else None,
+                    self.log_file_stderr
+                )
+            )
 
         # set up a termination handler, that does the internal cleanup. This
         # is needed when e.g. our parent process is aborted and thus all child
         # processes are terminated. We need to ensure all our monitoring
         # threads also terminate.
-        def watch_termination(thread):
-            self.process.wait()
-            self.terminate()
-
-        tools.run_in_thread(watch_termination)
+        tools.run_in_thread(
+            lambda thread:
+            self.process.wait() and self.terminate()
+        )
 
 
     #---------------------------------------------------------------------------
