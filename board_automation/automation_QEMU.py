@@ -738,9 +738,16 @@ def get_qemu(target, printer=None):
             'cores':    5
         },
         'rpi3': {
-            'qemu-bin': 'qemu-system-aarch64',
-            'machine':  'raspi3',
-            'memory':   1024,
+            'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-aarch64',
+            'machine':  'raspi3b',
+            #'memory':   1024, # RasPi3 has 1 GiB of memory
+            #'cores': 4, # RasPi3 has 4 cores, can'tv run just one
+            #'raw_params': [
+            #    '-singlestep',
+            #    #'--accel', 'tcg,thread=single',
+            #    '-d', 'cpu_reset,int,in_asm,cpu,exec,nochain,mmu,page,unimp,guest_errors',
+            #    '-D', '/ramdisk/qemu_log.txt',
+            #],
         },
         'spike64': {
             'qemu-bin': 'qemu-system-riscv64',
@@ -1070,6 +1077,9 @@ class QemuProxyRunner():
                 128*1024*1024, # 128 MiB
                 [(self.run_context.system_image, 'os_image.elf')])
             qemu.add_sdcard_from_image(sd_card_image)
+
+        elif (platform == 'rpi3'):
+            pass # ToDo: look into SD-card support
 
         elif self.run_context.sd_card_size and (self.run_context.sd_card_size > 0):
             # If the test framework is invoked with an SD card image, but the

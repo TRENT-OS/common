@@ -30,6 +30,7 @@ def get_test_runner(run_context):
             'zynqmp',
             'zynqmp-qemu-xilinx',
             'zynq7000',
+            'rpi3',
             'spike32',
             'spike64',
             'hifive',
@@ -45,7 +46,7 @@ def get_test_runner(run_context):
             'sabre-hw',
         ],
         automation_RasPi: [
-            'rpi3',
+            'rpi3-hw',
         ],
         automation_zcu102: [
             'migv',
