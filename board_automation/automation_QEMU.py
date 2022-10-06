@@ -759,6 +759,11 @@ def get_qemu(target, printer=None):
             'memory':   1024,
         },
         'zynqmp': {
+            'qemu-bin': 'qemu-system-aarch64',
+            'machine':  'xlnx-zcu102',
+            'memory':   4096,
+        },
+        'zynqmp-qemu-xilinx': {
             'qemu-bin': QEMU_zcu102, # this is really the class, not an instance
             'memory':   4096,
         },
@@ -1016,10 +1021,11 @@ class QemuProxyRunner(board_automation.System_Runner):
             assert(qemu.config['cpu'].startswith('cortex-a'))
             qemu.add_dev_nic_none()
 
-        # SD Card setup,
-        if self.run_context.platform == 'zynqmp':
-            # QEMU boots from a SD card, so the image must be set up. And there
-            # are 2 QEMU instances actually, thus some more setup is needed.
+        # Platform setup (SD Card ...)
+        if isinstance(qemu, QEMU_zcu102):
+            # ZynqMP on the Xilinx-QEMU boots from a SD card, so the image must
+            # be set up. There are 2 QEMU instances actually, thus some more
+            # setup is needed.
             qemu.setup(
                 os.path.join(
                     self.run_context.resource_dir,
