@@ -819,6 +819,12 @@ def get_qemu(target, printer=None):
             'cpu':      'rv64', # virt uses rv64gc
             'memory':   3072,
             'cores':    1, # virt supports up to 8 harts
+            #'raw_params': [
+            #    '-singlestep',
+            #    #'--accel', 'tcg,thread=single',
+            #    '-d', 'cpu_reset,int,in_asm,cpu,exec,nochain,mmu,page,unimp,guest_errors',
+            #    '-D', '/ramdisk/qemu_log.txt',
+            #]
         },
     }
 
