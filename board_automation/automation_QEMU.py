@@ -821,7 +821,6 @@ def get_qemu(target, printer=None):
         return None
 
     if isinstance(qemu_bin, str):
-        qemu_cfg['qemu-bin'] = qemu_bin
         return QEMU_AppWrapper(qemu_cfg)
 
     # Instead of a string, a class reference can also be used. The actual
