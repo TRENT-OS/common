@@ -24,7 +24,8 @@ def get_test_runner(
     # translate generic platform names
     translation_table = {
         'spike': 'spike64',
-        'qemu-arm-virt': 'qemu-arm-virt-a53'
+        'qemu-arm-virt': 'qemu-arm-virt-a53',
+        'qemu-riscv-virt': 'qemu-riscv-virt64'
     }
     new_plat = translation_table.get(platform, None)
     if new_plat is not None:
@@ -52,7 +53,9 @@ def get_test_runner(
             'qemu-arm-virt-a15',
             'qemu-arm-virt-a53',
             'qemu-arm-virt-a57',
-            'qemu-arm-virt-a72']):
+            'qemu-arm-virt-a72',
+            'qemu-riscv-virt32',
+            'qemu-riscv-virt64']):
         return automation_QEMU.QemuProxyRunner(
                         run_context,
                         proxy_config,

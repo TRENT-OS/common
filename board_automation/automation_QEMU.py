@@ -809,6 +809,20 @@ def get_qemu(target, printer=None):
             'cpu':      'cortex-a72',
             'memory':   2048,
         },
+        'qemu-riscv-virt32': {
+            'qemu-bin': 'qemu-system-riscv32',
+            'machine':  'virt',
+            'cpu':      'rv32', # virt uses rv32gc
+            'memory':   3072,
+            'cores':    1 # virt supports up to 8 harts
+        },
+        'qemu-riscv-virt64': {
+            'qemu-bin': 'qemu-system-riscv64',
+            'machine':  'virt',
+            'cpu':      'rv64', # virt uses rv64gc
+            'memory':   3072,
+            'cores':    1 # virt supports up to 8 harts
+        },
     }
 
     if not target:
