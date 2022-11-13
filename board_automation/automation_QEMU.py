@@ -297,6 +297,8 @@ class QEMU_AppWrapper:
             'drives': [],
             'devices': [],
             'serial_ports': [],
+            # non-QEMU related settings, e.g. for OS
+            'syslog-uart': 0,
             # Defaults are set, add or overwrite custom config. Python support
             # for merging dictionaries:
             #   Python >= 3.9:  z = x | y
@@ -547,6 +549,10 @@ class QEMU_AppWrapper:
         for p in param:
             cmd_arr += ['-serial', p if p else 'null']
 
+        # non-QEMU specific settings
+        param = cfg.pop('syslog-uart')
+        assert(param in [0, 1])
+
         if cfg:
             if printer:
                 printer.print(f'QEMU: unsupported config: {cfg}')
@@ -716,7 +722,8 @@ def get_qemu(target, printer=None):
         'sabre': {
             'qemu-bin': '/opt/hc/bin/qemu-system-arm',
             'machine':  'sabrelite',
-            'memory':   1024
+            'memory':   1024,
+            'syslog-uart': 1, # kernel log is on UART1, not UART0
         },
         'migv_qemu': {
             'qemu-bin': '/opt/hc/migv/bin/qemu-system-riscv64',
@@ -757,6 +764,7 @@ def get_qemu(target, printer=None):
             'qemu-bin': '/opt/hc/bin/qemu-system-arm',
             'machine':  'xilinx-zynq-a9',
             'memory':   1024,
+            'syslog-uart': 1, # kernel log is on UART1, not UART0
         },
         'zynqmp': {
             'qemu-bin': 'qemu-system-aarch64',
@@ -997,8 +1005,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # some platforms have the syslog on UART_0 and UART_1 is available for
         # data exchange. Others do it the other way around, UART_0 is available
         # for data exchange and UART_1 is used for the syslog.
-        has_syslog_on_uart_1 = self.run_context.platform in ['sabre',
-                                                             'zynq7000']
+        has_syslog_on_uart_1 = (1 == qemu.config['syslog-uart'])
         has_data_uart = (self.run_context.platform in ['sabre',
                                                        'zynq7000',
                                                        'zynqmp',
