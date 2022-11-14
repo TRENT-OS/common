@@ -957,9 +957,31 @@ class QemuProxyRunner(board_automation.System_Runner):
                 printer = self.get_printer())
         assert( qemu is not None )
 
+        # QEMU debug log: -d <option,option...> -D <logfile>
+        #
+        #   tid
+        #       new in v7.1, separate logs per CPU (use „-D logfile-%d“)
+        #   in_asm
+        #       show assembly (one for each compiled TB, use "-singelstep")
+        #       if v7.1 just says "OBJD-T: 73c23f91", then QEMU lacks
+        #       libcapstone support to see "add x19, x19, #0xff0"
+        #   nochain
+        #       don't chain compiled TBs
+        #   exec
+        #       show each executed TB (and the CPU ID)
+        #       Trace <CPU-ID>: <tb> [<tb->tc.ptr>/<pc>/<tb-flags>/<tb-flags>] <symbol>
+        #   int
+        #       show interrupts/exceptions
+        #   cpu
+        #       show CPU registers before entering a TB
+        #   unimp
+        #       log unimplemented functionality
+        #   guest_errors
+        #       log invalid operations
+
         #qemu.config['singlestep'] = True
-        #qemu.add_params('-d', 'in_asm,cpu') # logged to stderr
-        #qemu.add_params('-d', 'in_asm') # logged to stderr
+        #qemu.add_params('-d', 'in_asm,nochain') # logged to stderr
+        #qemu.add_params('-d', 'in_asm,exec,nochain') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
         if self.run_context.platform in ['hifive', 'migv_qemu']:
