@@ -641,7 +641,7 @@ class QEMU_zcu102(QEMU_AppWrapper):
             raise Exception('The resource directory does not contain \
                              all necessary files to start QEMU')
 
-        # We don't pass a kernel to QEMU, because for the zcu102 platform is has
+        # We don't pass a kernel to QEMU, because the zcu102 platform has
         # "ROM code" that can boot U-Boot from an SD card. A special U-Boot
         # version has been created that loads os_image.elf then.
         sd_card_image = os.path.join(log_dir, 'sdcard1.img')
