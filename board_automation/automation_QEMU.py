@@ -345,7 +345,6 @@ class QEMU_AppWrapper:
         self.config['drives'] += [param_dict]
 
 
-
     #---------------------------------------------------------------------------
     def add_device(self, dev_type, sub_type, param_dict = None):
         # A list preserves the order of added elements
