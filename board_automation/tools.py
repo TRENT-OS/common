@@ -269,6 +269,13 @@ class Timeout_Checker():
 
 
     #---------------------------------------------------------------------------
+    def __str__(self):
+        return 'Timeout: ' + (
+                    'infinite' if self.is_infinite() \
+                    else f'{self.get_remaining()} sec')
+
+
+    #---------------------------------------------------------------------------
     @classmethod
     def infinite(cls):
         return cls(-1)
