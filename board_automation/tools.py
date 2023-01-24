@@ -47,7 +47,7 @@ def print_files_from_folder(folder):
                         "%Y-%m-%d %H:%M:%S",
                         time.gmtime(stat_info.st_mtime))
 
-        print('  {:8d}   {}   {}'.format(stat_info.st_size, time_str, f))
+        print(f'  {stat_info.st_size:8d}   {time_str}   {f}')
 
 
 #-------------------------------------------------------------------------------
@@ -120,7 +120,7 @@ def find_usb_by_serial(serial):
 
     base_dir = '/sys/bus/usb/devices'
 
-    print('check {} for serial: {}'.format(base_dir, serial))
+    print(f'check {base_dir} for serial: {serial}')
 
     def get_id(dn, id_file):
         file_name = os.path.join(dn, id_file)
@@ -131,10 +131,9 @@ def find_usb_by_serial(serial):
     for usbid in os.listdir(base_dir):
         dn = os.path.join(base_dir, usbid)
         if (serial == get_id(dn, 'serial')):
-            print('  {}:{} at {}'.format(
-                    get_id(dn, 'idVendor'),
-                    get_id(dn, 'idProduct'),
-                    dn))
+            vid = get_id(dn, 'idVendor')
+            pid = get_id(dn, 'idProduct')
+            print(f'  {vid}:{pid} at {dn}')
             # no break here, serial may not be unique
 
 

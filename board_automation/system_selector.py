@@ -29,7 +29,7 @@ def get_test_runner(
     }
     new_plat = translation_table.get(platform, None)
     if new_plat is not None:
-        print('translating PLATFORM: {} -> {}'.format(platform, new_plat))
+        print(f'translating PLATFORM: {platform} -> {new_plat}')
         platform = new_plat
 
 
@@ -80,4 +80,4 @@ def get_test_runner(
                         run_context,
                         additional_params)
 
-    raise Exception('unsupported platform: {}'.format(platform))
+    raise Exception(f'unsupported platform: {platform}')

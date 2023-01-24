@@ -63,7 +63,7 @@ class TTY_USB():
                             os.path.join(dev_fqn, 'device/driver')))
 
             device = TTY_USB(
-                        '/dev/{}'.format(dev),
+                        f'/dev/{dev}',
                         vid,
                         pid,
                         serial,
@@ -82,13 +82,8 @@ class TTY_USB():
         print('USB/serial adapter list')
         dev_list = self_or_cls.get_device_list()
         for dev in dev_list:
-            print('  {} is {}:{} {} at {}, driver {}'.format(
-                  dev.device,
-                  dev.vid,
-                  dev.pid,
-                  's/n {}'.format(dev.serial) if dev.serial else '[no serial]',
-                  dev.usb_path,
-                  dev.driver))
+            sn = f's/n {dev.serial}' if dev.serial else '[no s/n]'
+            print(f'  {dev.device} is {dev.vid}:{dev.pid} {sn} at {dev.usb_path}, driver {dev.driver}')
 
         return dev_list
 
@@ -99,7 +94,7 @@ class TTY_USB():
 
         dev_list = self_or_cls.get_and_print_device_list()
 
-        print('opening {}, {}'.format(usb_path, serial))
+        print(f'opening {usb_path}, {serial}')
 
         my_device = None
 
@@ -122,15 +117,14 @@ class TTY_USB():
             raise Exception('device not found')
 
         if usb_path and (usb_path != my_device.usb_path):
-            raise Exception('USB path different, expected {}, got {}'.format(usb_path, my_device.usb_path))
+            raise Exception(f'USB path different, expected {usb_path}, got {my_device.usb_path}')
 
         if serial and (serial != my_device.serial):
-            raise Exception('serial different, expected {}, got {}'.format(serial, my_device.serial))
+            raise Exception(f'serial different, expected {serial}, got {my_device.serial}')
 
-        print('using {} ({}, USB path {})'.format(
-            my_device.device,
-            my_device.serial or '[no s/n]',
-            my_device.usb_path or ''))
+        sn = f's/n {dev.serial}' if dev.serial else '[no s/n]'
+        usb_path = my_device.usb_path or '[None]'
+        print(f'using {my_device.device} ({sn}, USB path {usb_path})')
 
         return my_device
 
@@ -150,7 +144,7 @@ class UART_Reader():
             printer = None):
 
         if not os.path.exists(device):
-            raise Exception('UART missing: {}'.format(device))
+            raise Exception(f'UART missing: {device}')
 
         self.device  = device
         self.baud    = baud
@@ -192,13 +186,11 @@ class UART_Reader():
 
             delta = datetime.datetime.now() - start;
 
-            msg = '[{}] {}{}'.format(delta, line_str, os.linesep)
-            f_log.write(msg)
+            f_log.write(f'[{delta}] {line_str}{os.linesep}')
             f_log.flush() # ensure things are really written
 
             if print_log:
-                msg = '[{} {}] {}'.format(delta, self.name, line_str)
-                self.print(msg)
+                self.print(f'[{delta} {self.name}] {line_str}')
 
 
     #---------------------------------------------------------------------------
@@ -214,7 +206,7 @@ class UART_Reader():
 
         except Exception as e:
             exc_info = sys.exc_info()
-            self.print('Exception: {}'.format(e))
+            self.print(f'Exception: {e}')
             traceback.print_exception(*exc_info)
 
 

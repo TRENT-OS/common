@@ -70,8 +70,9 @@ def list_devices(vid = 0x0403):
         dev_vid = get_id_from_file(dn, 'idVendor')
         dev_pid = get_id_from_file(dn, 'idProduct')
         dev_ser = get_id_from_file(dn, 'serial')
-        if (dev_vid != '{:04x}'.format(vid)): continue
-        print('{}:{} {:12} at {}'.format(dev_vid, dev_pid, dev_ser or '', usb_path))
+        if (dev_vid != f'{vid:04x}'): continue
+        if dev_ser is None: dev_ser = ''
+        print(f'{dev_vid}:{dev_pid} {dev_ser:12} at {usb_path}')
 
 
 #-------------------------------------------------------------------------------
@@ -80,7 +81,7 @@ def get_pyftdi_gpio(url):
     list_devices()
     ftdi.Ftdi.show_devices()
 
-    print('opening {}'.format(url))
+    print(f'opening {url}')
     gpio_contoller = gpio.GpioAsyncController()
     gpio_contoller.configure(url, direction=0xFF)
 

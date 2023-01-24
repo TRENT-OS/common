@@ -54,8 +54,7 @@ class System_Runner():
             raise Exception('ERROR: no system image given')
 
         if not os.path.isfile(run_context.system_image):
-            raise Exception('ERROR: missing system image: {}'.format(
-                    run_context.system_image))
+            raise Exception(f'ERROR: missing system image: {run_context.system_image}')
 
         self.run_context  = run_context
         self.board_setup  = board_setup
@@ -67,9 +66,7 @@ class System_Runner():
         sys_log_file_fqn = self.get_log_file_fqn('guest_out.txt')
         if sys_log_file_fqn:
             self.system_log_file = tools.Log_File(sys_log_file_fqn)
-
-            self.print('  test system log: {}'.format(
-                self.system_log_file.name))
+            self.print(f'  test system log: {self.system_log_file.name}')
 
 
     #---------------------------------------------------------------------------
@@ -150,7 +147,7 @@ class System_Runner():
         ])
 
         if not ret:
-            raise Exception('boot string #{}.{} not found'.format(idx, idx2))
+            raise Exception(f'boot string #{idx}.{idx2} not found')
 
         # There is no CapDL loader in a native system.
         if boot_mode == BootMode.SEL4_NATIVE:
@@ -169,7 +166,7 @@ class System_Runner():
         ])
 
         if not ret:
-            raise Exception('CapDL Loader string #{}.{} not found'.format(idx, idx2))
+            raise Exception(f'CapDL Loader string #{idx}.{idx2} not found')
 
 
     #---------------------------------------------------------------------------
@@ -188,7 +185,7 @@ class System_Runner():
             return None
 
         if not os.path.isdir(log_dir):
-            raise Exception('log directory missing: {}'.format(log_dir))
+            raise Exception(f'log directory missing: {log_dir}')
 
         return os.path.join(log_dir, name)
 
