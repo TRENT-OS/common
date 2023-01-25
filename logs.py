@@ -12,24 +12,6 @@ from board_automation import tools
 
 
 #------------------------------------------------------------------------------
-def open_file_non_blocking(file_name, mode='rt', newline=None,
-                           encoding='latin-1'):
-    """
-    Opens a file and set non blocking OS flag. By default, the file is opened as
-    'text file' in 'read-only' mode and universal newline detection is applies.
-    Encoding default to 'latin-1' instead the python's 'utf-8' default to stick
-    to single-byte chars and avoid encoding exceptions in case corrupted data is
-    read.
-    Returns a file object.
-    """
-
-    return tools.Log_File(file_name).open_non_blocking(
-                mode = mode,
-                newline = newline,
-                encoding = encoding)
-
-
-#------------------------------------------------------------------------------
 def read_line_from_log_file_with_timeout(f, timeout_sec=None):
     """
     Read a line from a logfile with a timeout. If the timeout is None, it is
