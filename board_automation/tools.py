@@ -387,12 +387,14 @@ class Log_File():
             if not timeout or timeout.has_expired():
                 return None
 
-            if checker_func and not checker_func():
-                return None
-
             # wait and try again. Using 100 ms seems a good trade-off here, so
             # we don't block for too long or cause much CPU load
             timeout.sleep(0.1)
+
+            # Check for custom abort after sleeping, as there could have been
+            # an asynchronous cancellation.
+            if checker_func and not checker_func():
+                return None
 
 
     #---------------------------------------------------------------------------
