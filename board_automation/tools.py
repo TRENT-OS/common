@@ -375,13 +375,14 @@ class Log_File():
         while True:
 
             if os.path.isfile(self.name):
+                # Try to open the file for reading. This return a handle or
+                # raises an exception on error
                 f = open(self.name, mode=mode, encoding=encoding,
                          newline=newline)
-                if f:
-                    fd = f.fileno()
-                    flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-                    fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
-
+                assert f is not None
+                fd = f.fileno()
+                flag = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
                 return f
 
             if not timeout or timeout.has_expired():
