@@ -43,11 +43,3 @@ def run_test_log_match_set(fixture, test_system, expr_array, timeout_sec=0):
                                 timeout_sec)
     if not ret:
         raise Exception(" missing: %s"%(expr_fail))
-
-
-#-------------------------------------------------------------------------------
-def run_test_log_match(fixture, test_system, expr, timeout_sec=0):
-    """performs the simplest test by getting the log file from the fixture and
-    then assert the match of the regular expression in a line of the log"""
-
-    return run_test_log_match_set(fixture, test_system, [expr], timeout_sec)
