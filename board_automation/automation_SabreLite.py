@@ -9,7 +9,7 @@ from . import board_automation
 #===============================================================================
 #===============================================================================
 
-class Automation(object):
+class Automation():
 
     # fuse setting boot: SW1-1 off, SW1-2 off
     # USB boot:          SW1-1 off, SW1-2 on

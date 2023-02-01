@@ -146,7 +146,7 @@ class Relay(Relay_Base):
 #===============================================================================
 #===============================================================================
 
-class Relay_Config(object):
+class Relay_Config():
     """
     A relay configuration groups multiple relays. These relays can even come
     from different relay boards
