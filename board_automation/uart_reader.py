@@ -189,8 +189,9 @@ class UART_Reader():
 
             delta = datetime.datetime.now() - start;
 
-            f_log.write(f'[{delta}] {line_str}{os.linesep}')
-            f_log.flush() # ensure things are really written
+            if f_log is not None:
+                f_log.write(f'[{delta}] {line_str}{os.linesep}')
+                f_log.flush() # ensure things are really written
 
             if print_log:
                 self.print(f'[{delta} {self.name}] {line_str}')
