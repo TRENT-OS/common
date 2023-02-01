@@ -166,7 +166,7 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
 #===============================================================================
 class MyThread(threading.Thread):
 # This is a convenience wrapper class for using threads. It reports exceptions
-# in the thread's main function that would otherwise get lost. Forthermore it
+# in the thread's main function that would otherwise get lost. Furthermore it
 # allows passing a context to the thread.
 # Python recommends using daemon threads, because many common use case are
 # basically starting worker threads that can be killed when the application
@@ -310,9 +310,9 @@ class Timeout_Checker(object):
 
         sub_timeout = Timeout_Checker(timeout_sec)
 
-        # If we are an infinite timeout, we can can grant anything, otherwise
-        # we must cut the timeout at out own timeout and basically return a
-        # clone of us.
+        # If we are an infinite timeout, we can can guarantee anything,
+        # otherwise we must cut the timeout at our own timeout and basically
+        # return a clone of us.
         if not self.is_infinite() \
            and (sub_timeout.is_infinite() \
                 or (sub_timeout.get_remaining() > self.get_remaining())):
