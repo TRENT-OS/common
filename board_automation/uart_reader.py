@@ -152,6 +152,8 @@ class UART_Reader():
         self.name    = name
 
         self.port    = None
+        self.monitor_thread = None
+        self.stop_thread = False
 
 
     #---------------------------------------------------------------------------
@@ -165,7 +167,10 @@ class UART_Reader():
 
         start = datetime.datetime.now()
 
-        while self.port and self.port.is_open:
+        while not self.stop_thread:
+
+            assert self.port is not None
+            assert self.port.is_open
 
             # This will throw a SerialException if the port is in use by another
             # process. We don't see any problem when opening the port, but here
@@ -230,7 +235,7 @@ class UART_Reader():
                                   bytesize = serial.serialutil.EIGHTBITS,
                                   parity   = serial.serialutil.PARITY_NONE,
                                   stopbits = serial.serialutil.STOPBITS_ONE,
-                                  timeout  = 1,
+                                  timeout  = 0.5,
                                   #xonxoff=False,
                                   #rtscts=False,
                                   #write_timeout=None,
@@ -239,16 +244,22 @@ class UART_Reader():
                                   #exclusive=None
                                   )
 
-        threading.Thread(
+        self.monitor_thread = threading.Thread(
             target = self.monitor_channel,
             args = (log_file, print_log)
-        ).start()
+        )
+
+        self.monitor_thread.start()
 
 
     #---------------------------------------------------------------------------
     def stop(self):
 
-        if self.port:
-            port = self.port
+        if self.monitor_thread is not None:
+            self.stop_thread = True
+            self.monitor_thread.join()
+            self.monitor_thread = None
+
+        if self.port is not None:
+            self.port.close()
             self.port = None
-            port.close()
