@@ -167,6 +167,9 @@ class UART_Reader():
 
         while self.port and self.port.is_open:
 
+            # This will throw a SerialException if the port is in use by another
+            # process. We don't see any problem when opening the port, but here
+            # when doing a read access.
             line = self.port.readline()
             if (len(line) == 0):
                 # readline() encountered a timeout
@@ -176,7 +179,7 @@ class UART_Reader():
             # can always be decoded as all 256 bit combinations are valid. For
             # the standard string UTF-8 encoding with multi-byte chars, certain
             # bit pattern (e.g. from line garbage or transmission errors) would
-            # raise decoding errors because they are are no valid.
+            # raise decoding errors because they are not valid.
             line_str = line.strip().decode('latin_1')
 
             # remove backspace chars, as we don't want to have the
@@ -216,10 +219,24 @@ class UART_Reader():
         # port must not be open
         assert(self.port is None)
 
-        # use a timeout for reading, so the monitoring thread wont block
-        # forever. Instead, it reads nothing, can check if the port is still
-        # open and exit otherwise.
-        self.port = serial.Serial(self.device, self.baud, timeout=1)
+        # When the port is not 'None', it is immediately opened on object
+        # creation, no call to open() is necessary.
+        # Using a timeout for reading prevents the monitoring thread from
+        # blocking forever. Instead, it reads nothing, can check if the port is
+        # still open and exit if not.
+        self.port = serial.Serial(port     = self.device,
+                                  baudrate = self.baud,
+                                  bytesize = serial.serialutil.EIGHTBITS,
+                                  parity   = serial.serialutil.PARITY_NONE,
+                                  stopbits = serial.serialutil.STOPBITS_ONE,
+                                  timeout  = 1,
+                                  #xonxoff=False,
+                                  #rtscts=False,
+                                  #write_timeout=None,
+                                  #dsrdtr=False,
+                                  #inter_byte_timeout=None,
+                                  #exclusive=None
+                                  )
 
         threading.Thread(
             target = self.monitor_channel,
