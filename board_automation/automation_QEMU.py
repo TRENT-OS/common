@@ -370,7 +370,7 @@ class QEMU_AppWrapper:
 
     #---------------------------------------------------------------------------
     def add_dev_char_socket(self, param_dict):
-        assert(len(param_dict) > 0)  # there must be parameters
+        assert len(param_dict) > 0  # there must be parameters
         # Any chardevice based on a socket is basically just another
         # device
         self.add_device('chardev', 'socket', param_dict)
@@ -391,7 +391,7 @@ class QEMU_AppWrapper:
 
     #---------------------------------------------------------------------------
     def add_dev_loader(self, param_dict):
-        assert(len(param_dict) > 0)  # there must be loader parameters
+        assert len(param_dict) > 0  # there must be loader parameters
         self.add_device('device', 'loader', param_dict)
 
 
@@ -456,8 +456,8 @@ class QEMU_AppWrapper:
     def get_machine(self):
         param = self.config.get('machine', None)
         if param and isinstance(param, list):
-            assert(isinstance(param[0], str))
-            assert(isinstance(param[1], dict)) # may have 'dumpdtb=<filename>'
+            assert isinstance(param[0], str)
+            assert isinstance(param[1], dict) # may have 'dumpdtb=<filename>'
             param = param[0]
         return param
 
@@ -479,8 +479,8 @@ class QEMU_AppWrapper:
             printer.print('no machine given for QEMU')
             return None
         if isinstance(param, list):
-            assert(isinstance(param[0], str))
-            assert(isinstance(param[1], dict)) # may have 'dumpdtb=<filename>'
+            assert isinstance(param[0], str)
+            assert isinstance(param[1], dict) # may have 'dumpdtb=<filename>'
             param = param[0] + ',' + self.serialize_param_dict(param[1])
         cmd_arr += ['-machine', param]
 
@@ -529,7 +529,7 @@ class QEMU_AppWrapper:
 
         param = cfg.pop('drives', [])
         for param_dict in param:
-            assert(len(param_dict) > 0)  # there must be parameters
+            assert len(param_dict) > 0  # there must be parameters
             cmd_arr += ['-drive', self.serialize_param_dict(param_dict)]
 
         param = cfg.pop('devices', [])
@@ -550,7 +550,7 @@ class QEMU_AppWrapper:
 
         # non-QEMU specific settings
         param = cfg.pop('syslog-uart')
-        assert(param in [0, 1])
+        assert param in [0, 1]
 
         if cfg:
             if printer:
@@ -971,11 +971,11 @@ class QemuProxyRunner(board_automation.System_Runner):
     #---------------------------------------------------------------------------
     def start_qemu(self, print_log):
 
-        assert( not self.is_qemu_running() )
+        assert not self.is_qemu_running()
         qemu = get_qemu(
                 target  = self.run_context.platform,
                 printer = self.get_printer())
-        assert( qemu is not None )
+        assert qemu is not None
 
         # QEMU debug log: -d <option,option...> -D <logfile>
         #
@@ -1023,7 +1023,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                                                        'zynq7000',
                                                        'zynqmp',
                                                        'hifive'])
-        assert(0 == len(qemu.config['serial_ports']))
+        assert 0 == len(qemu.config['serial_ports'])
         if not has_syslog_on_uart_1:
             # UART 0 is syslog
             qemu.sys_log_setup(
@@ -1037,11 +1037,11 @@ class QemuProxyRunner(board_automation.System_Runner):
             qemu.add_serial_port(f'tcp:localhost:{self.qemu_uart_network_port},server')
         elif has_syslog_on_uart_1:
             # UART 0 must be a dummy in this case
-            assert(0 == len(qemu.serial_ports))
+            assert 0 == len(qemu.serial_ports)
             qemu.add_serial_port('null')
 
         if has_syslog_on_uart_1:
-            assert(1 == len(qemu.config['serial_ports']))
+            assert 1 == len(qemu.config['serial_ports'])
             # UART 1 is syslog
             qemu.sys_log_setup(
                 self.system_log_file.name,
@@ -1059,7 +1059,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
             # ToDo: check virt platform of other architectures
-            assert(qemu.config['cpu'].startswith('cortex-a'))
+            assert qemu.config['cpu'].startswith('cortex-a')
             qemu.add_dev_nic_none()
 
         # Platform setup (SD Card ...)
@@ -1134,15 +1134,15 @@ class QemuProxyRunner(board_automation.System_Runner):
     def start_proxy(self, print_log):
 
         # QEMU must be running, but not Proxy and the proxy params must exist
-        assert( self.is_qemu_running() )
-        assert( not self.is_proxy_running() )
-        assert( self.proxy_cfg_str )
+        assert self.is_qemu_running()
+        assert not self.is_proxy_running()
+        assert self.proxy_cfg_str
 
         arr = self.proxy_cfg_str.split(',')
         proxy_app = arr[0]
         serial_qemu_connection = arr[1] if (1 != len(arr)) else 'TCP'
 
-        assert(proxy_app is not None )
+        assert proxy_app is not None
         if not os.path.isfile(proxy_app):
             raise Exception(f'ERROR: missing proxy app: {proxy_app}')
 
