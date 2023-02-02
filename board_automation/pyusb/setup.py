@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Copyright 2009-2017 Wander Lairson Costa
-# Copyright 2009-2020 PyUSB contributors
+# Copyright 2009-2021 PyUSB contributors
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -31,12 +31,6 @@
 
 import sys
 from setuptools import setup
-from distutils.version import LooseVersion
-from setuptools import __version__ as setuptools_version
-
-setuptools_scm = 'setuptools_scm'
-if LooseVersion(setuptools_version).version[0] < 12:
-    setuptools_scm += '<2.0'
 
 
 def pyusb_scm_version():
@@ -45,8 +39,8 @@ def pyusb_scm_version():
 
     def editable_local_scheme(version):
         local_scheme = get_local_node_and_date(version)
-        # distutils scans sys.argv for matching command classes
-        # (see `distutils.dist.Distribution._parse_command_opts`)
+        # setuptools scans sys.argv for matching command classes
+        # (see `setuptools._distutils.dist.Distribution._parse_command_opts`)
         if "develop" in sys.argv[1:]:
             return local_scheme + "-editable"
         return local_scheme
@@ -67,18 +61,23 @@ pyusb_scm_version.pop = lambda *_: None
 setup(
     name='pyusb',
     use_scm_version=pyusb_scm_version,
-    setup_requires=setuptools_scm,
-    description='Python USB access module',
-    author='Robert Wlodarczyk',
-    author_email='robert@simplicityguy.com',
+    setup_requires='setuptools_scm',
+    description='Easy USB access for Python',
+    author='Jonas Malaco',
+    author_email='me@jonasmalaco.com',
     url='https://pyusb.github.io/pyusb',
+    project_urls={
+        'docs/Tutorial': 'https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst',
+        'docs/FAQ': 'https://github.com/pyusb/pyusb/blob/master/docs/faq.rst',
+        'Source': 'https://github.com/pyusb/pyusb',
+    },
     packages=['usb', 'usb.backend'],
     long_description=
 """
 PyUSB offers easy USB devices communication in Python.
 It should work without additional code in any environment with
-Python >= 2.4, ctypes and a pre-built USB backend library
-(currently: libusb 0.1.x, libusb 1.x, or OpenUSB).
+Python >= 3.7, ctypes and a pre-built USB backend library
+(currently: libusb 1.x, libusb 0.1.x or OpenUSB).
 """,
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -94,16 +93,16 @@ Python >= 2.4, ctypes and a pre-built USB backend library
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Microsoft :: Windows :: Windows Vista',
         'Operating System :: Microsoft :: Windows :: Windows 7',
+        'Operating System :: Microsoft :: Windows :: Windows 10',
         'Operating System :: POSIX :: BSD :: FreeBSD',
         'Operating System :: POSIX :: BSD :: NetBSD',
         'Operating System :: POSIX :: BSD :: OpenBSD',
         'Operating System :: POSIX :: Linux',
         'Operating System :: POSIX :: SunOS/Solaris',
-        'Programming Language :: Python :: 2.4',
-        'Programming Language :: Python :: 2.5',
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         # source(CPython,Jython,IronPython,PyPy): "The Long Term" section of
         # http://ojs.pythonpapers.org/index.php/tpp/article/viewFile/23/23
         'Programming Language :: Python :: Implementation :: CPython',
@@ -115,6 +114,7 @@ Python >= 2.4, ctypes and a pre-built USB backend library
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: System :: Hardware :: Hardware Drivers'
-    ]
+    ],
+    python_requires='>=3.7.0'
 )
 
