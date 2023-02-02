@@ -11,12 +11,14 @@ from enum import Enum
 #===============================================================================
 #===============================================================================
 
-#-------------------------------------------------------------------------------
 class BootMode(Enum):
     BARE_METAL  = 1
     SEL4_NATIVE = 2
     SEL4_CAMKES = 3
 
+
+#===============================================================================
+#===============================================================================
 
 class Run_Context(object):
 
@@ -54,7 +56,6 @@ class System_Runner(object):
         if not os.path.isfile(run_context.system_image):
             raise Exception('ERROR: missing system image: {}'.format(
                     run_context.system_image))
-
 
         self.run_context  = run_context
         self.board_setup  = board_setup
@@ -115,6 +116,7 @@ class System_Runner(object):
     # sub-classes may implement this
     def do_stop(self):
         pass
+
 
     #---------------------------------------------------------------------------
     # sub-classes may implement this
