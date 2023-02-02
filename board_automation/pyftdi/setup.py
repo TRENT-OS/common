@@ -1,31 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2010-2020 Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2021 Emmanuel Blot <emmanuel.blot@free.fr>
 # Copyright (c) 2010-2016 Neotion
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 #pylint: disable-msg=unused-variable
 #pylint: disable-msg=missing-docstring
@@ -33,14 +13,16 @@
 #pylint: disable-msg=no-self-use
 
 from codecs import open as codec_open
-from os import close, unlink
-from os.path import abspath, dirname, join as joinpath
-from py_compile import compile as pycompile, PyCompileError
-from re import split as resplit, search as research
-from sys import stderr
-from tempfile import mkstemp
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py
+from distutils.cmd import Command
+from distutils.log import DEBUG, INFO
+from os import close, getcwd, unlink, walk
+from os.path import abspath, dirname, join as joinpath, relpath
+from py_compile import compile as pycompile, PyCompileError
+from re import split as resplit, search as research
+from sys import stderr, exit as sysexit
+from tempfile import mkstemp
 
 
 NAME = 'pyftdi'
@@ -56,20 +38,19 @@ CLASSIFIERS = [
     'License :: OSI Approved :: BSD License',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX',
-    'Programming Language :: Python :: 3.5',
-    'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: System :: Hardware :: Hardware Drivers',
 ]
 INSTALL_REQUIRES = [
-    'pyusb >= 1.0.0',
+    'pyusb >= 1.0.0, != 1.2.0',
     'pyserial >= 3.0',
 ]
-INSTALL_REQUIRES_3_5 = [
-    # only for old Python 3.5 support
-    'aenum >= 2.1.0'
+TEST_REQUIRES = [
+    'ruamel.yaml >= 0.16',
 ]
 
 HERE = abspath(dirname(__file__))
@@ -121,9 +102,8 @@ class BuildPy(build_py):
        syntax error is catched, raised and setup.py actually fails should this
        event arise.
 
-       This step is critical to check that an unsupported syntax (for ex. 3.6
-       syntax w/ a 3.5 interpreter) does not end into a 'valid' package from
-       setuptools perspective...
+       This step is critical to check that an unsupported syntax does not end
+       up as a 'valid' package from setuptools perspective...
     """
 
     def byte_compile(self, files):
@@ -134,7 +114,6 @@ class BuildPy(build_py):
             close(pfd)
             try:
                 pycompile(file, pyc, doraise=True)
-                self._check_line_width(file)
                 continue
             except PyCompileError as exc:
                 # avoid chaining exceptions
@@ -144,17 +123,48 @@ class BuildPy(build_py):
                 unlink(pyc)
         super().byte_compile(files)
 
-    def _check_line_width(self, file):
-        with open(file, 'rt') as pfp:
-            for lpos, line in enumerate(pfp, start=1):
-                if len(line) > 80:
-                    print('\n  %d: %s' % (lpos, line.rstrip()))
-                    raise RuntimeError("Invalid line width '%s'" % file)
+
+class CheckStyle(Command):
+    """A custom command to check Python coding style."""
+
+    description = 'check coding style'
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        self.announce('checking coding style', level=INFO)
+        filecount = 0
+        topdir = dirname(__file__) or getcwd()
+        for dpath, dnames, fnames in walk(topdir):
+            dnames[:] = [d for d in dnames
+                         if not d.startswith('.') and d != 'doc']
+            for filename in (joinpath(dpath, f)
+                             for f in fnames if f.endswith('.py')):
+                self.announce('checking %s' % relpath(filename, topdir),
+                              level=INFO)
+                with open(filename, 'rt') as pfp:
+                    for lpos, line in enumerate(pfp, start=1):
+                        if len(line) > 80:
+                            print('\n  %d: %s' % (lpos, line.rstrip()))
+                            raise RuntimeError("Invalid line width '%s'" %
+                                               relpath(filename, topdir))
+                filecount += 1
+        if not filecount:
+            raise RuntimeError('No Python file found from "%s"' %
+                               topdir)
 
 
 def main():
     setup(
-        cmdclass={'build_py': BuildPy},
+        cmdclass={
+            'build_py': BuildPy,
+            'check_style': CheckStyle
+        },
         name=NAME,
         description=find_meta('description'),
         license=find_meta('license'),
@@ -177,11 +187,8 @@ def main():
                       'pyftdi.serialext': ['*.rst', 'doc/api/uart.rst']},
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
-        extras_require={
-            ':python_version == "3.5"': INSTALL_REQUIRES_3_5,
-        },
-        # tests requires >=3.6
-        python_requires='>=3.5',
+        test_requires=TEST_REQUIRES,
+        python_requires='>=3.7',
     )
 
 
@@ -190,4 +197,4 @@ if __name__ == '__main__':
         main()
     except Exception as exc:
         print(exc, file=stderr)
-        exit(1)
+        sysexit(1)

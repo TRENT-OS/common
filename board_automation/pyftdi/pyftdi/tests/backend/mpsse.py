@@ -2,6 +2,8 @@
 
 # Copyright (c) 2020, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
 
 from collections import deque
 from logging import getLogger
@@ -23,9 +25,9 @@ class VirtMpsseTracer(FtdiMpsseTracer):
         iface -= 1
         try:
             self._engines[iface]
-        except IndexError:
+        except IndexError as exc:
             raise ValueError('No MPSSE engine available on interface %d' %
-                             iface)
+                             iface) from exc
         if not self._engines[iface]:
             self._engines[iface] = VirtMpsseEngine(self, self._port)
         return self._engines[iface]

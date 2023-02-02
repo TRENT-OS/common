@@ -2,27 +2,7 @@
 # Copyright (c) 2008-2016, Neotion
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """Bit field and sequence management."""
 
@@ -33,6 +13,7 @@ from .misc import is_iterable, xor
 #pylint: disable-msg=unneeded-not
 #pylint: disable-msg=too-many-branches
 #pylint: disable-msg=too-many-arguments
+#pylint: disable-msg=duplicate-key
 
 class BitSequenceError(Exception):
     """Bit sequence error"""
@@ -198,8 +179,9 @@ class BitSequence:
                 seq.extend([smap[bit] for bit in reversed(iterable)])
             else:
                 seq.extend([smap[bit] for bit in iterable])
-        except KeyError:
-            raise BitSequenceError("Invalid binary character in initializer")
+        except KeyError as exc:
+            raise BitSequenceError('Invalid binary character in initializer') \
+                    from exc
 
     def _init_from_sibling(self, value: 'BitSequence', msb: bool) -> None:
         """Initialize from a fellow object"""
@@ -357,8 +339,8 @@ class BitSequence:
         """
         try:
             ref = self._seq[0]
-        except IndexError:
-            raise ValueError('Empty sequence')
+        except IndexError as exc:
+            raise ValueError('Empty sequence') from exc
         if len(self._seq) == 1:
             return ref
         for b in self._seq[1:]:
@@ -422,8 +404,9 @@ class BitZSequence(BitSequence):
                 seq.extend([smap[bit] for bit in reversed(iterable)])
             else:
                 seq.extend([smap[bit] for bit in iterable])
-        except KeyError:
-            raise BitSequenceError("Invalid binary character in initializer")
+        except KeyError as exc:
+            raise BitSequenceError("Invalid binary character in initializer") \
+                    from exc
 
     def __repr__(self):
         smap = {False: '0', True: '1', BitZSequence.Z: 'Z'}

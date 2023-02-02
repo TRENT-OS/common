@@ -2,33 +2,19 @@
 # Copyright (c) 2008-2016, Neotion
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
+
+# this file has not been updated for a while, so coding style needs some love
+#pylint: disable-msg=attribute-defined-outside-init
+#pylint: disable-msg=invalid-name
+#pylint: disable-msg=missing-class-docstring
+#pylint: disable-msg=missing-module-docstring
 
 from io import RawIOBase
+from time import sleep, time as now
+from serial import SerialBase, SerialException, VERSION as pyserialver
 from pyftdi.ftdi import Ftdi
 from pyftdi.usbtools import UsbToolsError
-from serial import SerialBase, SerialException, VERSION as pyserialver
-from time import sleep, time as now
 
 
 class FtdiSerial(SerialBase):
@@ -50,7 +36,7 @@ class FtdiSerial(SerialBase):
             device = Ftdi.create_from_url(self.port)
         except (UsbToolsError, IOError) as ex:
             raise SerialException('Unable to open USB port %s: %s' %
-                                  (self.portstr, str(ex)))
+                                  (self.portstr, str(ex))) from ex
         self.udev = device
         self._set_open_state(True)
         self._reconfigure_port()
@@ -90,7 +76,6 @@ class FtdiSerial(SerialBase):
     def flush(self):
         """Flush of file like objects. In this case, wait until all data
            is written."""
-        pass
 
     def reset_input_buffer(self):
         """Clear input buffer, discarding all that is in the buffer."""
@@ -194,7 +179,7 @@ class FtdiSerial(SerialBase):
                 pass
         except IOError as exc:
             err = self.udev.get_error_string()
-            raise SerialException("%s (%s)" % (str(exc), err))
+            raise SerialException("%s (%s)" % (str(exc), err)) from exc
 
     def _set_open_state(self, open_):
         self.is_open = bool(open_)

@@ -2,36 +2,17 @@
 # Copyright (c) 2016, Emmanuel Bouaziz <ebouaziz@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """JTAG support for PyFdti"""
 
+#pylint: disable-msg=invalid-name
+#pylint: disable-msg=missing-function-docstring
+
 from time import sleep
-from typing import Any, List, Tuple, Union
+from typing import List, Tuple, Union
 from .ftdi import Ftdi
 from .bits import BitSequence
-
-#pylint: disable-msg=invalid-name
 
 
 class JtagError(Exception):
@@ -142,7 +123,7 @@ class JtagStateMachine:
                 return path+[state]
             # candidate paths
             paths = []
-            for n, x in enumerate(state.exits):
+            for x in state.exits:
                 # next state is self (loop around), kill the path
                 if x == state:
                     continue
@@ -159,7 +140,8 @@ class JtagStateMachine:
                        key=lambda x: x[0])[1] if paths else []
         return next_path(source, target, [])
 
-    def get_events(self, path):
+    @classmethod
+    def get_events(cls, path):
         """Build up an event sequence from a state sequence, so that the
            resulting event sequence allows the JTAG state machine to advance
            from the first state to the last one of the input sequence"""
@@ -213,9 +195,17 @@ class JtagController:
         cmd = bytearray((Ftdi.SET_BITS_LOW, 0x0, self.direction))
         self._ftdi.write_data(cmd)
 
-    def close(self) -> None:
+    def close(self, freeze: bool = False) -> None:
+        """Close the JTAG interface/port.
+
+           :param freeze: if set, FTDI port is not reset to its default
+                          state on close. This means the port is left with
+                          its current configuration and output signals.
+                          This feature should not be used except for very
+                          specific needs.
+        """
         if self._ftdi.is_connected:
-            self._ftdi.close()
+            self._ftdi.close(freeze)
 
     def purge(self) -> None:
         self._ftdi.purge_buffers()
@@ -252,7 +242,8 @@ class JtagController:
             self._ftdi.write_data(self._write_buff)
             self._write_buff = bytearray()
 
-    def write_tms(self, tms: BitSequence) -> None:
+    def write_tms(self, tms: BitSequence,
+                  should_read: bool=False) -> None:
         """Change the TAP controller state"""
         if not isinstance(tms, BitSequence):
             raise JtagError('Expect a BitSequence')
@@ -266,7 +257,10 @@ class JtagController:
         # print("TMS", tms, (self._last is not None) and 'w/ Last' or '')
         # reset last bit
         self._last = None
-        cmd = bytearray((Ftdi.WRITE_BITS_TMS_NVE, length-1, out.tobyte()))
+        if should_read:
+            cmd = bytearray((Ftdi.RW_BITS_TMS_PVE_NVE, length-1, out.tobyte()))
+        else:
+            cmd = bytearray((Ftdi.WRITE_BITS_TMS_NVE, length-1, out.tobyte()))
         self._stack_cmd(cmd)
         self.sync()
 
@@ -302,13 +296,13 @@ class JtagController:
         if bit_count:
             self._write_bits(out[pos:])
 
-    def shift_register(self, out: BitSequence,
-                       use_last: bool = False) -> BitSequence:
-        """Shift a BitSequence into the current register and retrieve the
-           register output"""
+    def write_with_read(self, out: BitSequence,
+                        use_last: bool = False) -> int:
+        """Write the given BitSequence while reading the same
+           number of bits into the FTDI read buffer.
+           Returns the number of bits written."""
         if not isinstance(out, BitSequence):
             return JtagError('Expect a BitSequence')
-        length = len(out)
         if use_last:
             (out, self._last) = (out[:-1], int(out[-1]))
         byte_count = len(out)//8
@@ -330,6 +324,10 @@ class JtagController:
             cmd.append(out[pos:].tobyte())
             self._stack_cmd(cmd)
             # print("push %d bits" % bit_count)
+        return len(out)
+
+    def read_from_buffer(self, length) -> BitSequence:
+        """Read the specified number of bits from the FTDI read buffer."""
         self.sync()
         bs = BitSequence()
         byte_count = length//8
@@ -450,9 +448,13 @@ class JtagEngine:
         """Configure the FTDI interface as a JTAG controller"""
         self._ctrl.configure(url)
 
-    def close(self) -> None:
-        """Terminate a JTAG session/connection"""
-        self._ctrl.close()
+    def close(self, freeze: bool = False) -> None:
+        """Terminate a JTAG session/connection.
+
+           :param freeze: if set, FTDI port is not reset to its default
+                          state on close.
+        """
+        self._ctrl.close(freeze)
 
     def purge(self) -> None:
         """Purge low level HW buffers"""
@@ -463,9 +465,9 @@ class JtagEngine:
         self._ctrl.reset()
         self._sm.reset()
 
-    def write_tms(self, out) -> None:
+    def write_tms(self, out, should_read=False) -> None:
         """Change the TAP controller state"""
-        self._ctrl.write_tms(out)
+        self._ctrl.write_tms(out, should_read=should_read)
 
     def read(self, length):
         """Read out a sequence of bits from TDO"""
@@ -521,17 +523,55 @@ class JtagEngine:
         """Capture the current data register from the TAP controller"""
         self.change_state('capture_dr')
 
-    def shift_register(self, length) -> BitSequence:
+    def sync(self) -> None:
+        self._ctrl.sync()
+
+    def shift_register(self, out: BitSequence) -> BitSequence:
         if not self._sm.state_of('shift'):
             raise JtagError("Invalid state: %s" % self._sm.state())
         if self._sm.state_of('capture'):
             bs = BitSequence(False)
             self._ctrl.write_tms(bs)
             self._sm.handle_events(bs)
-        return self._ctrl.shift_register(length)
 
-    def sync(self) -> None:
-        self._ctrl.sync()
+        bits_out = self._ctrl.write_with_read(out)
+        bs = self._ctrl.read_from_buffer(bits_out)
+        if len(bs) != len(out):
+            raise ValueError("Internal error")
+
+        return bs
+
+    def shift_and_update_register(self, out: BitSequence) -> BitSequence:
+        """Shift a BitSequence into the current register and retrieve the
+           register output, advancing the state to update_*r"""
+        if not self._sm.state_of('shift'):
+            raise JtagError("Invalid state: %s" % self._sm.state())
+        if self._sm.state_of('capture'):
+            bs = BitSequence(False)
+            self._ctrl.write_tms(bs)
+            self._sm.handle_events(bs)
+
+        # Write with read using the last bit for next TMS transition
+        bits_out = self._ctrl.write_with_read(out, use_last=True)
+
+        # Advance the state from shift to update
+        events = BitSequence('11')
+        self.write_tms(events, should_read=True)
+        # (write_tms calls sync())
+        # update the current state machine's state
+        self._sm.handle_events(events)
+
+        # Read the bits clocked out as part of the initial write
+        bs = self._ctrl.read_from_buffer(bits_out)
+
+        # Read the last two bits clocked out with TMS above
+        # (but only use the lowest bit in the return data)
+        last_bits = self._ctrl.read_from_buffer(2)
+        bs.append(BitSequence((last_bits.tobyte() & 0x1), length=1))
+        if len(bs) != len(out):
+            raise ValueError("Internal error")
+
+        return bs
 
 
 class JtagTool:
@@ -582,12 +622,12 @@ class JtagTool:
         for length in range(1, MAX_REG_LEN):
             print("Testing for length %d" % length)
             if length > 5:
-                return
+                raise ValueError('Abort detection over reg length %d' % length)
             zero = BitSequence(length=length)
             inj = BitSequence(length=length+PATTERN_LEN)
             inj.inc()
             ok = False
-            for p in range(1, 1 << PATTERN_LEN):
+            for _ in range(1, 1 << PATTERN_LEN):
                 ok = False
                 self._engine.write(zero, False)
                 rcv = self._engine.shift_register(inj)

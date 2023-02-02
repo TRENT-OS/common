@@ -2,27 +2,7 @@
 # Copyright (c) 2016, Emmanuel Bouaziz <ebouaziz@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """USB Helpers"""
 
@@ -189,8 +169,8 @@ class UsbTools:
                     devs = list(devs)
                 try:
                     dev = devs[devdesc.index or 0]
-                except IndexError:
-                    raise IOError("No such device")
+                except IndexError as exc:
+                    raise IOError("No such device") from exc
             else:
                 devs = cls._find_devices(devdesc.vid, devdesc.pid)
                 dev = list(devs)[0] if devs else None
@@ -327,8 +307,8 @@ class UsbTools:
             else:
                 interface = to_int(path)
                 report_devices = False
-        except (IndexError, ValueError):
-            raise UsbToolsError('Invalid device URL: %s' % urlstr)
+        except (IndexError, ValueError) as exc:
+            raise UsbToolsError('Invalid device URL: %s' % urlstr) from exc
         candidates, idx = cls.enumerate_candidates(urlparts, vdict, pdict,
                                                    default_vendor)
         if report_devices:
@@ -396,14 +376,14 @@ class UsbTools:
             if plcomps[1]:
                 try:
                     product = to_int(plcomps[1])
-                except ValueError:
+                except ValueError as exc:
                     raise UsbToolsError('Product %s is not referenced' %
-                                        plcomps[1])
+                                        plcomps[1]) from exc
             else:
                 product = None
-        except (IndexError, ValueError):
+        except (IndexError, ValueError) as exc:
             raise UsbToolsError('Invalid device URL: %s' %
-                                urlunsplit(urlparts))
+                                urlunsplit(urlparts)) from exc
         sernum = None
         idx = None
         bus = None
@@ -413,9 +393,9 @@ class UsbTools:
             try:
                 bus = int(locators[0], 16)
                 address = int(locators[1], 16)
-            except ValueError:
+            except ValueError as exc:
                 raise UsbToolsError('Invalid bus/address: %s' %
-                                    ':'.join(locators))
+                                    ':'.join(locators)) from exc
         else:
             if locators and locators[0]:
                 try:
@@ -563,6 +543,7 @@ class UsbTools:
            :return: the string read from the USB device
         """
         if cls.UsbApi is None:
+            #pylint: disable-msg=import-outside-toplevel
             import inspect
             args, _, _, _ = \
                 inspect.signature(UsbDevice.read).parameters
@@ -643,7 +624,6 @@ class UsbTools:
                     vid = dev.idVendor
                     pid = dev.idProduct
                     ifc = max([cfg.bNumInterfaces for cfg in dev])
-                    sernum = UsbTools.get_string(dev, dev.iSerialNumber)
                     k = (vid, pid, dev.bus, dev.address)
                     if k not in filtered_devs:
                         filtered_devs[k] = dev

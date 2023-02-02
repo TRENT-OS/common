@@ -1,7 +1,9 @@
 """Constant importer from existing modules."""
 
-# Copyright (c) 2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2020-2021, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
 
 #pylint: disable-msg=missing-docstring
 #pylint: disable-msg=invalid-name
@@ -12,10 +14,6 @@ from importlib import import_module
 from sys import version_info
 from pyftdi.ftdi import Ftdi
 from pyftdi.misc import EasyDict
-
-# need support for f-string syntax
-if version_info[:2] < (3, 6):
-    raise AssertionError('Python 3.6 is required for this module')
 
 
 class UsbConstants:
@@ -160,8 +158,8 @@ class FtdiConstants:
             self._rcache[prefix] = self._load_constants(prefix, True)
         try:
             return self._rcache[prefix][name.lower()]
-        except KeyError:
-            raise ValueError(f'Unknown name {prefix}.{name}')
+        except KeyError as exc:
+            raise ValueError(f'Unknown name {prefix}.{name}') from exc
 
     def dec_req_name(self, request: int) -> str:
         return self.get_name('sio_req', request)

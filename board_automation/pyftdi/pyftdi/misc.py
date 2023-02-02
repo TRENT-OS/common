@@ -1,38 +1,21 @@
-# Copyright (c) 2010-2020 Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2021 Emmanuel Blot <emmanuel.blot@free.fr>
 # Copyright (c) 2008-2016, Neotion
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
-"""Miscelleanous helpers"""
+"""Miscellaneous helpers"""
+
+#pylint: disable-msg=invalid-name
+#pylint: disable-msg=import-outside-toplevel
+#pylint: disable-msg=too-many-locals
+#pylint: disable-msg=too-many-arguments
 
 from array import array
 from copy import deepcopy
 from re import match
 from typing import Any, Iterable, Optional, Sequence, Union
 
-#pylint: disable-msg=invalid-name
-#pylint: disable-msg=too-many-arguments
 
 # String values evaluated as true boolean values
 TRUE_BOOLEANS = ['on', 'true', 'enable', 'enabled', 'yes', 'high', '1']
@@ -64,8 +47,8 @@ def hexdump(data: Union[bytes, bytearray, Iterable[int]],
             src = bytearray(b''.join(data))
         else:
             src = data
-    except Exception:
-        raise TypeError("Unsupported data type '%s'" % type(data))
+    except Exception as exc:
+        raise TypeError("Unsupported data type '%s'" % type(data)) from exc
 
     length = 16
     result = []
@@ -79,8 +62,7 @@ def hexdump(data: Union[bytes, bytearray, Iterable[int]],
                     result.append('*\n')
                     abv = True
                 continue
-            else:
-                abv = False
+            abv = False
         hexa = ' '.join(["%02x" % x for x in s])
         printable = s.translate(ASCIIFILTER).decode('ascii')
         if full:
@@ -114,8 +96,8 @@ def hexline(data: Union[bytes, bytearray, Iterable[int]],
             src = bytearray(b''.join(data))
         else:
             src = data
-    except Exception:
-        raise TypeError("Unsupported data type '%s'" % type(data))
+    except Exception as exc:
+        raise TypeError("Unsupported data type '%s'" % type(data)) from exc
 
     hexa = sep.join(["%02x" % x for x in src])
     printable = src.translate(ASCIIFILTER).decode('ascii')
@@ -174,10 +156,9 @@ def to_bool(value: Union[int, bool, str], permissive: bool = True,
     if isinstance(value, int):
         if allow_int:
             return bool(value)
-        else:
-            if permissive:
-                return False
-            raise ValueError("Invalid boolean value: '%d'", value)
+        if permissive:
+            return False
+        raise ValueError("Invalid boolean value: '%d'" % value)
     if value.lower() in TRUE_BOOLEANS:
         return True
     if permissive or (value.lower() in FALSE_BOOLEANS):
@@ -217,6 +198,7 @@ def xor(_a_: bool, _b_: bool) -> bool:
        :param _b_: second argument
        :return: xor-ed value
     """
+    #pylint: disable-msg=superfluous-parens
     return bool((not(_a_) and _b_) or (_a_ and not(_b_)))
 
 
@@ -266,7 +248,8 @@ def pretty_size(size, sep: str = ' ',
 
 
 def add_custom_devices(ftdicls=None,
-                       vpstr: Optional[Sequence[str]] = None) -> None:
+                       vpstr: Optional[Sequence[str]] = None,
+                       force_hex: bool = False) -> None:
     """Helper function to add custom VID/PID to FTDI device identifer map.
 
        The string to parse should match the following format:
@@ -288,6 +271,8 @@ def add_custom_devices(ftdicls=None,
        :param vpstr: typically, a option switch string describing the device
                      to add
        :param ftdicls: the Ftdi class that should support the new device.
+       :param force_hex: if set, consider that the pid/vid string are
+                         hexadecimal encoded values.
     """
     from inspect import isclass
     if not isclass(ftdicls):
@@ -302,9 +287,12 @@ def add_custom_devices(ftdicls=None,
                 vname, vid = vid.split('=', 1)
             if '=' in pid:
                 pname, pid = pid.split('=', 1)
-            vid, pid = [to_int(v) for v in (vid, pid)]
-        except ValueError:
-            raise ValueError('Invalid VID:PID value')
+            if force_hex:
+                vid, pid = [int(v, 16) for v in (vid, pid)]
+            else:
+                vid, pid = [to_int(v) for v in (vid, pid)]
+        except ValueError as exc:
+            raise ValueError('Invalid VID:PID value') from exc
         if vid not in vidpids:
             ftdicls.add_custom_vendor(vid, vname)
             vidpids[vid] = set()
@@ -321,6 +309,13 @@ def show_call_stack():
     print_stack(_current_frames()[current_thread().ident])
 
 
+class classproperty(property):
+    """Getter property decorator for a class"""
+    #pylint: disable=invalid-name
+    def __get__(self, obj: Any, objtype=None) -> Any:
+        return super().__get__(objtype)
+
+
 class EasyDict(dict):
     """Dictionary whose members can be accessed as instance members
     """
@@ -334,9 +329,9 @@ class EasyDict(dict):
     def __getattr__(self, name):
         try:
             return self.__getitem__(name)
-        except KeyError:
+        except KeyError as exc:
             raise AttributeError("'%s' object has no attribute '%s'" %
-                                 (self.__class__.__name__, name))
+                                 (self.__class__.__name__, name)) from exc
 
     def __setattr__(self, name, value):
         self.__setitem__(name, value)

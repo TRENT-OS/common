@@ -1,27 +1,7 @@
-# Copyright (c) 2017-2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2017-2021, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """I2C support for PyFdti"""
 
@@ -96,8 +76,8 @@ class I2cPort:
         """
         try:
             self._format = self.FORMATS[width]
-        except KeyError:
-            raise I2cIOError('Unsupported integer width')
+        except KeyError as exc:
+            raise I2cIOError('Unsupported integer width') from exc
         self._endian = '>' if bigendian else '<'
 
     def shift_address(self, offset: int):
@@ -219,8 +199,8 @@ class I2cPort:
         """
         try:
             fmt = ''.join((self._endian, self.FORMATS[width]))
-        except KeyError:
-            raise I2cIOError('Unsupported integer width')
+        except KeyError as exc:
+            raise I2cIOError('Unsupported integer width') from exc
         return self._controller.poll_cond(
             self._address+self._shift if start else None,
             fmt, mask, value, count, relax=relax)
@@ -378,7 +358,7 @@ class I2cController:
     SDA_I_BIT = 0x04  #AD2
     SCL_FB_BIT = 0x80  #AD7
     PAYLOAD_MAX_LENGTH = 0xFF00  # 16 bits max (- spare for control)
-    HIGHEST_I2C_ADDRESS = 0x78
+    HIGHEST_I2C_ADDRESS = 0x7F
     DEFAULT_BUS_FREQUENCY = 100000.0
     HIGH_BUS_FREQUENCY = 400000.0
     RETRY_COUNT = 3
@@ -418,6 +398,7 @@ class I2cController:
         self._ck_su_sto = 0
         self._ck_idle = 0
         self._read_optim = True
+        self._disable_3phase_clock = False
 
     def set_retry_count(self, count: int) -> None:
         """Change the default retry count when a communication error occurs,
@@ -462,9 +443,9 @@ class I2cController:
         if frequency <= 100E3:
             timings = self.I2C_100K
         elif frequency <= 400E3:
-            timings = self.I2C_100K
+            timings = self.I2C_400K
         else:
-            timings = self.I2C_100K
+            timings = self.I2C_1M
         if 'clockstretching' in kwargs:
             clkstrch = bool(kwargs['clockstretching'])
             del kwargs['clockstretching']
@@ -518,7 +499,8 @@ class I2cController:
             self._frequency = (2.0*frequency)/3.0
             self._tx_size, self._rx_size = self._ftdi.fifo_sizes
             self._ftdi.enable_adaptive_clock(clkstrch)
-            self._ftdi.enable_3phase_clock(True)
+            if not self._disable_3phase_clock:
+                self._ftdi.enable_3phase_clock(True)
             try:
                 self._ftdi.enable_drivezero_mode(self.SCL_BIT |
                                                  self.SDA_O_BIT |
@@ -532,12 +514,40 @@ class I2cController:
             if not self._wide_port:
                 self._set_gpio_direction(8, io_out & 0xFF, io_dir & 0xFF)
 
-    def terminate(self) -> None:
+    def force_clock_mode(self, enable: bool) -> None:
+        """Force unsupported I2C clock signalling on devices that have no I2C
+           capabilities (i.e. FT2232D). I2cController cowardly refuses to use
+           unsupported devices. When this mode is enabled, I2cController can
+           drive such devices, but I2C signalling is not compliant with I2C
+           specifications and may not work with most I2C slaves.
+
+           :py:meth:`force_clock_mode` should always be called before
+           :py:meth:`configure` to be effective.
+
+           This is a fully unsupported feature (bug reports will be ignored).
+
+           :param enable: whether to drive non-I2C capable devices.
+        """
+        if enable:
+            self.log.info('I2C signalling forced to non-I2C compliant mode.')
+        self._disable_3phase_clock = enable
+
+    def close(self, freeze: bool = False) -> None:
         """Close the FTDI interface.
+
+           :param freeze: if set, FTDI port is not reset to its default
+                          state on close.
         """
         with self._lock:
             if self._ftdi.is_connected:
-                self._ftdi.close()
+                self._ftdi.close(freeze)
+
+    def terminate(self) -> None:
+        """Close the FTDI interface.
+
+           :note: deprecated API, use close()
+        """
+        self.close()
 
     def get_port(self, address: int) -> I2cPort:
         """Obtain an I2cPort to drive an I2c slave.
@@ -581,7 +591,7 @@ class I2cController:
         return self._ftdi.is_connected and bool(self._start)
 
     @classmethod
-    def validate_address(cls, address: int) -> None:
+    def validate_address(cls, address: Optional[int]) -> None:
         """Assert an I2C slave address is in the supported range.
            None is a special bypass address.
 
@@ -856,10 +866,9 @@ class I2cController:
                     if (cond & mask) == value:
                         self.log.debug('Poll condition matched')
                         break
-                    else:
-                        data = None
-                        self.log.debug('Poll condition not fulfilled: %x/%x',
-                                       cond & mask, value)
+                    data = None
+                    self.log.debug('Poll condition not fulfilled: %x/%x',
+                                   cond & mask, value)
                 do_epilog = relax
                 if not data:
                     self.log.warning('Poll condition failed')
@@ -970,6 +979,7 @@ class I2cController:
     @property
     def _stop(self) -> Tuple[int]:
         return self._clk_lo_data_hi * self._ck_hd_sta + \
+               self._clk_lo_data_lo * self._ck_hd_sta + \
                self._data_lo * self._ck_su_sto + \
                self._idle * self._ck_idle
 
@@ -1014,7 +1024,7 @@ class I2cController:
         if i2caddress is None:
             return
         self.log.debug('   prolog 0x%x', i2caddress >> 1)
-        cmd = bytearray(self._idle)
+        cmd = bytearray(self._idle * self._ck_delay)
         cmd.extend(self._start)
         cmd.extend(self._write_byte)
         cmd.append(i2caddress)

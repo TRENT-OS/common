@@ -3,8 +3,12 @@
 Requirements
 ------------
 
-Python_ 3.5 or above is required; new tests require 3.6 or above, as they rely
-on fstring_ syntax (PEP_498_) and variable annotation syntax (PEP_526_).
+Python_ 3.7 or above is required.
+
+Python 3.6 has reached end-of-life on December 23rd, 2021.
+
+PyFtdi *v0.53* is the last PyFtdi version to support Python 3.6.
+PyFtdi *v0.52* is the last PyFtdi version to support Python 3.5.
 
 PyFtdi_ relies on PyUSB_, which itself depends on one of the following native
 libraries:
@@ -14,7 +18,7 @@ libraries:
 PyFtdi_ does not depend on any other native library, and only uses standard
 Python modules along with PyUSB_ and pyserial_.
 
-PyFtdi_ is beeing tested with PyUSB_ 1.0.2.
+PyFtdi_ is beeing tested with PyUSB_ 1.1.0.
 
 Development
 ~~~~~~~~~~~

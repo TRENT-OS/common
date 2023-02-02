@@ -1,30 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2018-2022, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """Tiny I2C bus scanner."""
 
@@ -50,6 +30,8 @@ class I2cBusScanner:
 
     SMB_READ_RANGE = list(range(0x30, 0x38)) + list(range(0x50, 0x60))
 
+    HIGHEST_I2C_SLAVE_ADDRESS = 0x78
+
     @classmethod
     def scan(cls, url: str, smb_mode: bool = True) -> None:
         """Scan an I2C bus to detect slave device.
@@ -64,7 +46,7 @@ class I2cBusScanner:
         try:
             i2c.set_retry_count(1)
             i2c.configure(url)
-            for addr in range(i2c.HIGHEST_I2C_ADDRESS+1):
+            for addr in range(cls.HIGHEST_I2C_SLAVE_ADDRESS+1):
                 port = i2c.get_port(addr)
                 if smb_mode:
                     try:
@@ -138,6 +120,7 @@ def main():
         FtdiLogger.set_level(loglevel)
 
         if args.virtual:
+            #pylint: disable-msg=import-outside-toplevel
             from pyftdi.usbtools import UsbTools
             # Force PyUSB to use PyFtdi test framework for USB backends
             UsbTools.BACKENDS = ('pyftdi.tests.backend.usbvirt', )
@@ -147,7 +130,7 @@ def main():
             loader.load(args.virtual)
 
         try:
-            add_custom_devices(Ftdi, args.vidpid)
+            add_custom_devices(Ftdi, args.vidpid, force_hex=True)
         except ValueError as exc:
             argparser.error(str(exc))
 

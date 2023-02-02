@@ -3,35 +3,15 @@
 """Simple FTDI EEPROM configurator.
 """
 
-# Copyright (c) 2019-2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2019-2022, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 from argparse import ArgumentParser, FileType
 from io import StringIO
 from logging import Formatter, StreamHandler, DEBUG, ERROR
-from sys import modules, stderr
+from sys import modules, stderr, stdout
 from textwrap import fill
 from traceback import format_exc
 from pyftdi import FtdiLogger
@@ -51,38 +31,63 @@ def main():
         argparser = ArgumentParser(description=modules[__name__].__doc__)
         argparser.add_argument('device', nargs='?', default='ftdi:///?',
                                help='serial port device name')
-        argparser.add_argument('-x', '--hexdump', action='store_true',
-                               help='dump EEPROM content as ASCII')
-        argparser.add_argument('-X', '--hexblock', type=int,
-                               help='dump EEPROM as indented hexa blocks')
-        argparser.add_argument('-i', '--input', type=FileType('rt'),
-                               help='input ini file to load EEPROM content')
-        argparser.add_argument('-l', '--load', default='all',
-                               choices=('all', 'raw', 'values'),
-                               help='section(s) to load from input file')
-        argparser.add_argument('-o', '--output', type=FileType('wt'),
-                               help='output ini file to save EEPROM content')
-        argparser.add_argument('-s', '--serial-number',
-                               help='set serial number')
-        argparser.add_argument('-m', '--manufacturer',
-                               help='set manufacturer name')
-        argparser.add_argument('-p', '--product',
-                               help='set product name')
-        argparser.add_argument('-c', '--config', action='append',
-                               help='change/configure a property '
-                                    'as key=value pair')
-        argparser.add_argument('-e', '--erase', action='store_true',
-                               help='erase the whole EEPROM content')
-        argparser.add_argument('-u', '--update', action='store_true',
-                               help='perform actual update, use w/ care')
-        argparser.add_argument('-P', '--vidpid', action='append',
-                               help='specify a custom VID:PID device ID, '
-                                    'may be repeated')
-        argparser.add_argument('-V', '--virtual', type=FileType('r'),
-                               help='use a virtual device, specified as YaML')
-        argparser.add_argument('-v', '--verbose', action='count', default=0,
+
+        files = argparser.add_argument_group(title='Files')
+        files.add_argument('-i', '--input', type=FileType('rt'),
+                           help='input ini file to load EEPROM content')
+        files.add_argument('-l', '--load', default='all',
+                           choices=('all', 'raw', 'values'),
+                           help='section(s) to load from input file')
+        files.add_argument('-o', '--output',
+                           help='output ini file to save EEPROM content')
+        files.add_argument('-V', '--virtual', type=FileType('r'),
+                           help='use a virtual device, specified as YaML')
+
+        device = argparser.add_argument_group(title='Device')
+        device.add_argument('-P', '--vidpid', action='append',
+                            help='specify a custom VID:PID device ID '
+                                 '(search for FTDI devices)')
+        device.add_argument('-M', '--eeprom',
+                            help='force an EEPROM model')
+        device.add_argument('-S', '--size', type=int,
+                            choices=FtdiEeprom.eeprom_sizes,
+                            help='force an EEPROM size')
+
+        fmt = argparser.add_argument_group(title='Format')
+        fmt.add_argument('-x', '--hexdump', action='store_true',
+                         help='dump EEPROM content as ASCII')
+        fmt.add_argument('-X', '--hexblock', type=int,
+                         help='dump EEPROM as indented hexa blocks')
+
+        config = argparser.add_argument_group(title='Configuration')
+        config.add_argument('-s', '--serial-number',
+                            help='set serial number')
+        config.add_argument('-m', '--manufacturer',
+                            help='set manufacturer name')
+        config.add_argument('-p', '--product',
+                            help='set product name')
+        config.add_argument('-c', '--config', action='append',
+                            help='change/configure a property as key=value '
+                                 'pair')
+        config.add_argument('--vid', type=lambda x: int(x, 16),
+                            help='shortcut to configure the USB vendor ID')
+        config.add_argument('--pid', type=lambda x: int(x, 16),
+                            help='shortcut to configure the USB product ID')
+
+        action = argparser.add_argument_group(title='Action')
+        action.add_argument('-e', '--erase', action='store_true',
+                            help='erase the whole EEPROM content')
+        action.add_argument('-E', '--full-erase', action='store_true',
+                            default=False,
+                            help='erase the whole EEPROM content, including '
+                                 'the CRC')
+        action.add_argument('-u', '--update', action='store_true',
+                            help='perform actual update, use w/ care')
+
+        extra = argparser.add_argument_group(title='Extras')
+        extra.add_argument('-v', '--verbose', action='count', default=0,
                                help='increase verbosity')
-        argparser.add_argument('-d', '--debug', action='store_true',
+        extra.add_argument('-d', '--debug', action='store_true',
                                help='enable debug mode')
         args = argparser.parse_args()
         debug = args.debug
@@ -102,6 +107,7 @@ def main():
         FtdiLogger.log.addHandler(StreamHandler(stderr))
 
         if args.virtual:
+            #pylint: disable-msg=import-outside-toplevel
             from pyftdi.usbtools import UsbTools
             # Force PyUSB to use PyFtdi test framework for USB backends
             UsbTools.BACKENDS = ('pyftdi.tests.backend.usbvirt', )
@@ -111,13 +117,13 @@ def main():
             loader.load(args.virtual)
 
         try:
-            add_custom_devices(Ftdi, args.vidpid)
+            add_custom_devices(Ftdi, args.vidpid, force_hex=True)
         except ValueError as exc:
             argparser.error(str(exc))
 
         eeprom = FtdiEeprom()
-        eeprom.open(args.device)
-        if args.erase:
+        eeprom.open(args.device, size=args.size, model=args.eeprom)
+        if args.erase or args.full_erase:
             eeprom.erase()
         if args.input:
             eeprom.load_config(args.input, args.load)
@@ -128,7 +134,7 @@ def main():
         if args.product:
             eeprom.set_product_name(args.product)
         for conf in args.config or []:
-            if conf == '?':
+            if conf in ('?', 'help'):
                 helpstr = ', '.join(sorted(eeprom.properties))
                 print(fill(helpstr, initial_indent='  ',
                            subsequent_indent='  '))
@@ -139,6 +145,8 @@ def main():
                     if not value:
                         argparser.error('Configuration %s without value' %
                                         conf)
+                    if value == 'help':
+                        value = '?'
                     helpio = StringIO()
                     eeprom.set_property(name, value, helpio)
                     helpstr = helpio.getvalue()
@@ -149,6 +157,10 @@ def main():
                     break
             else:
                 argparser.error('Missing name:value separator in %s' % conf)
+        if args.vid:
+            eeprom.set_property('vendor_id', args.vid)
+        if args.pid:
+            eeprom.set_property('product_id', args.pid)
         if args.hexdump:
             print(hexdump(eeprom.data))
         if args.hexblock is not None:
@@ -157,12 +169,16 @@ def main():
                 hexa = ' '.join(['%02x' % x for x in eeprom.data[pos:pos+16]])
                 print(indent, hexa, sep='')
         if args.update:
-            if eeprom.commit(False):
+            if eeprom.commit(False, no_crc=args.full_erase):
                 eeprom.reset_device()
         if args.verbose > 0:
             eeprom.dump_config()
         if args.output:
-            eeprom.save_config(args.output)
+            if args.output == '-':
+                eeprom.save_config(stdout)
+            else:
+                with open(args.output, 'wt') as ofp:
+                    eeprom.save_config(ofp)
 
     except (ImportError, IOError, NotImplementedError, ValueError) as exc:
         print('\nError: %s' % exc, file=stderr)

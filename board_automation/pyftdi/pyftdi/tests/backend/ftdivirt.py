@@ -1,7 +1,9 @@
 """PyUSB virtual FTDI device."""
 
-# Copyright (c) 2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2020-2021, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
 
 #pylint: disable-msg=missing-docstring
 #pylint: disable-msg=unused-argument
@@ -29,11 +31,6 @@ from typing import List, Mapping, NamedTuple, Optional, Sequence, Tuple
 from pyftdi.eeprom import FtdiEeprom   # only for consts, do not use code
 from .consts import FTDICONST, USBCONST
 from .mpsse import VirtMpsseEngine, VirtMpsseTracer
-
-
-# need support for f-string syntax
-if version_info[:2] < (3, 6):
-    raise AssertionError('Python 3.6 is required for this module')
 
 
 class Pipe:
@@ -72,11 +69,11 @@ class Pipe:
 
     def __getattr__(self, name):
         if self._zombie:
-            raise IOError(f'Closed pipe')
+            raise IOError('Closed pipe')
         try:
             pos = self.PIPE[name[0]]
-        except KeyError:
-            raise AttributeError(f'No such pipe attribute: {name}')
+        except KeyError as exc:
+            raise AttributeError(f'No such pipe attribute: {name}') from exc
         if not self._pipe:
             # lazy instanciation
             self._pipe = os.pipe()
@@ -306,8 +303,8 @@ class VirtFtdiPort:
         self._rx_thread.start()
         self._tx_thread.start()
 
-    def terminate(self):
-        self.log.debug('> terminate')
+    def close(self, freeze: bool = False) -> None:
+        self.log.debug('> close %d', freeze)
         if self._tx_thread:
             with self._cmd_q.lock:
                 self._cmd_q.q.append((self.Command.TERMINATE,))
@@ -325,6 +322,9 @@ class VirtFtdiPort:
         if self._tx_thread:
             self._tx_thread.join()
             self._tx_thread = None
+
+    def terminate(self):
+        self.close()
 
     def __getitem__(self, index: int) -> VirtualFtdiPin:
         if not isinstance(index, int):
@@ -583,7 +583,7 @@ class VirtFtdiPort:
         FRAC_INV_DIV = (0, 4, 2, 1, 3, 5, 6, 7)
         BAUDRATE_REF_BASE = 3.0E6  # 3 MHz
         BAUDRATE_REF_HIGH = 12.0E6  # 12 MHz
-        if self._parent.is_hispeed_device:
+        if self._parent.is_hispeed_device or self._parent.is_x_series:
             wIndex >>= 8
         divisor = wValue | (wIndex << 16)
         div = divisor & 0x3FFF
@@ -989,9 +989,12 @@ class VirtFtdi:
         for iface in range(self.PROPERTIES[self._version].ifcount):
             self._ports.append(VirtFtdiPort(self, iface+1))
 
-    def terminate(self):
+    def close(self, freeze: bool = False) -> None:
         for port in self._ports:
-            port.terminate()
+            port.close(freeze)
+
+    def terminate(self):
+        self.close()
 
     @property
     def version(self) -> int:
@@ -1024,6 +1027,14 @@ class VirtFtdi:
            :return: True if the FTDI device is HS
         """
         return self._version in (0x0700, 0x0800, 0x0900)
+
+    @property
+    def is_x_series(self) -> bool:
+        """Tell whether the device is a FT-X device
+
+           :return: True for FT-X device
+        """
+        return self._version == 0x1000
 
     def apply_eeprom_config(self, devdesc: dict,
                             cfgdescs: Sequence[dict]) -> None:
@@ -1100,8 +1111,9 @@ class VirtFtdi:
                                      'device')
                 try:
                     size = cls.EXT_EEPROMS[model.lower()]
-                except KeyError:
-                    raise ValueError('Unsupported EEPROM model: {model}')
+                except KeyError as exc:
+                    raise ValueError('Unsupported EEPROM model: {model}') \
+                            from exc
             data = eeprom.get('data', b'')
         if version in cls.INT_EEPROMS:
             int_size = cls.INT_EEPROMS[version]

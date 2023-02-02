@@ -4,27 +4,7 @@
 # Copyright (c) 2016-2020, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 #pylint: disable-msg=empty-docstring
 #pylint: disable-msg=missing-docstring
@@ -117,6 +97,40 @@ class GpioAsyncTestCase(FtdiTestCase):
         else:
             cls.skip_loopback = False
 
+    def test_gpio_freeze(self):
+        """Simple test to demonstrate freeze on close.
+
+           For now, it requires a logic analyzer to verify the output,
+           this is not automatically validated by SW
+        """
+        direction = 0xFF & ~((1 << 4) - 1) # 4 Out, 4 In
+        gpio = GpioAsyncController()
+        gpio.configure(self.url, direction=direction, frequency=1e3,
+                       initial=0x0)
+        port = gpio.get_gpio()
+        # emit a sequence as a visual marker on b3,b2,b1,b0
+        port.write([x<<4 for x in range(16)])
+        sleep(0.01)
+        # write 0b0110 to the port
+        port.write(0x6<<4)
+        sleep(0.001)
+        # close w/o freeze: all the outputs should be reset (usually 0b1111)
+        # it might need pull up (or pull down) to observe the change as
+        # output are not high-Z.
+        gpio.close()
+        sleep(0.01)
+        gpio.configure(self.url, direction=direction, frequency=1e3,
+                       initial=0x0)
+        port = gpio.get_gpio()
+        # emit a sequence as a visual marker with on b3 and b1
+        port.write([(x<<4)&0x90 for x in range(16)])
+        sleep(0.01)
+        # write 0b0110 to the port
+        port.write(0x6<<4)
+        sleep(0.01)
+        # close w/ freeze: outputs should not be reset (usually 0b0110)
+        gpio.close(True)
+
 
     def test_gpio_values(self):
         """Simple test to demonstrate bit-banging.
@@ -165,7 +179,9 @@ class GpioAsyncTestCase(FtdiTestCase):
         """Check initial values.
         """
         if self.skip_loopback:
-            raise SkipTest('Skip loopback test on multiport device')
+            raise SkipTest('Skip initial test on multiport device')
+        if not self.loader:
+            raise SkipTest('Skip initial test on physical device')
         direction = 0xFF & ~((1 << 4) - 1) # 4 Out, 4 In
         vftdi = self.loader.get_virtual_ftdi(1, 1)
         vport = vftdi.get_port(1)
@@ -612,8 +628,8 @@ def virtualize():
         # obtain the loader class associated with the virtual backend
         global VirtLoader
         VirtLoader = backend.create_loader()
-    except AttributeError:
-        raise AssertionError('Cannot load virtual USB backend')
+    except AttributeError as exc:
+        raise AssertionError('Cannot load virtual USB backend') from exc
 
 
 def main():
@@ -629,8 +645,8 @@ def main():
     level = environ.get('FTDI_LOGLEVEL', 'warning').upper()
     try:
         loglevel = getattr(logging, level)
-    except AttributeError:
-        raise ValueError(f'Invalid log level: {level}')
+    except AttributeError as exc:
+        raise ValueError(f'Invalid log level: {level}') from exc
     FtdiLogger.log.addHandler(logging.StreamHandler(stdout))
     FtdiLogger.set_level(loglevel)
     FtdiLogger.set_formatter(formatter)

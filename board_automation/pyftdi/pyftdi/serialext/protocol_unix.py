@@ -2,27 +2,17 @@
 # Copyright (c) 2016, Emmanuel Bouaziz <ebouaziz@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
+
+# this file has not been updated for a while, so coding style needs some love
+#pylint: disable-msg=broad-except
+#pylint: disable-msg=attribute-defined-outside-init
+#pylint: disable-msg=redefined-outer-name
+#pylint: disable-msg=invalid-name
+#pylint: disable-msg=too-few-public-methods
+#pylint: disable-msg=missing-function-docstring
+#pylint: disable-msg=missing-class-docstring
+#pylint: disable-msg=missing-module-docstring
 
 import errno
 import os
@@ -80,9 +70,9 @@ class SocketSerial(SerialBase):
             self.close()
             msg = "Could not open port: %s" % (str(e),)
             if isinstance(e, socket.error):
-                raise SerialExceptionWithErrno(msg, e.errno)
-            else:
-                raise SerialException(msg)
+                # pylint: disable-msg=no-member
+                raise SerialExceptionWithErrno(msg, e.errno) from e
+            raise SerialException(msg) from e
         self._set_open_state(True)
         self._lastdtr = None
 
@@ -101,6 +91,7 @@ class SocketSerial(SerialBase):
 
     def in_waiting(self):
         """Return the number of characters currently in the input buffer."""
+        #pylint: disable-msg=no-self-use
         return 0
 
     def read(self, size=1):
@@ -116,7 +107,7 @@ class SocketSerial(SerialBase):
                 if not ready:
                     break   # timeout
                 buf = self.sock.recv(size-len(read))
-                if not len(buf):
+                if not buf:
                     # Some character is ready, but none can be read
                     # it is a marker for a disconnected peer
                     raise portNotOpenError
@@ -155,35 +146,28 @@ class SocketSerial(SerialBase):
     def flush(self):
         """Flush of file like objects. In this case, wait until all data
            is written."""
-        pass
 
     def reset_input_buffer(self):
         """Clear input buffer, discarding all that is in the buffer."""
-        pass
 
     def reset_output_buffer(self):
         """Clear output buffer, aborting the current output and
         discarding all that is in the buffer."""
-        pass
 
     def send_break(self, duration=0.25):
         """Send break condition. Not supported"""
 
     def _update_break_state(self):
         """Send break condition. Not supported"""
-        pass
 
     def _update_rts_state(self):
         """Set terminal status line: Request To Send"""
-        pass
 
     def _update_dtr_state(self):
         """Set terminal status line: Data Terminal Ready"""
-        pass
 
     def setDTR(self, on=1):
         """Set terminal status line: Data Terminal Ready"""
-        pass
 
     @property
     def cts(self):

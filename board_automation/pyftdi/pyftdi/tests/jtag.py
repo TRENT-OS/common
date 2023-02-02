@@ -4,27 +4,7 @@
 # Copyright (c) 2011-2020, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the Neotion nor the names of its contributors may
-#       be used to endorse or promote products derived from this software
-#       without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL NEOTION BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-License-Identifier: BSD-3-Clause
 
 from os import environ
 from unittest import TestCase, main as ut_main, makeSuite
@@ -68,6 +48,33 @@ class JtagTestCase(TestCase):
         self.jtag.go_idle()
         print("IDCODE (idcode): 0x%08x" % int(idcode))
 
+    def test_idcode_shift_register(self):
+        """Read the IDCODE using the dedicated instruction with
+           shift_and_update_register"""
+        instruction = JTAG_INSTR['IDCODE']
+        self.jtag.change_state('shift_ir')
+        retval = self.jtag.shift_and_update_register(instruction)
+        print("retval: 0x%x" % int(retval))
+        self.jtag.go_idle()
+        self.jtag.change_state('shift_dr')
+        idcode = self.jtag.shift_and_update_register(BitSequence('0'*32))
+        self.jtag.go_idle()
+        print("IDCODE (idcode): 0x%08x" % int(idcode))
+
+    def test_bypass_shift_register(self):
+        """Test the BYPASS instruction using shift_and_update_register"""
+        instruction = JTAG_INSTR['BYPASS']
+        self.jtag.change_state('shift_ir')
+        retval = self.jtag.shift_and_update_register(instruction)
+        print("retval: 0x%x" % int(retval))
+        self.jtag.go_idle()
+        self.jtag.change_state('shift_dr')
+        _in = BitSequence('011011110000'*2, length=24)
+        out = self.jtag.shift_and_update_register(_in)
+        self.jtag.go_idle()
+        print("BYPASS sent: %s, received: %s  (should be left shifted by one)"
+              % (_in, out))
+
     def _test_detect_ir_length(self):
         """Detect the instruction register length"""
         self.jtag.go_idle()
@@ -76,7 +83,7 @@ class JtagTestCase(TestCase):
 
 
 def suite():
-    return makeSuite(JtagTestCase, '_test')
+    return makeSuite(JtagTestCase, 'test')
 
 
 if __name__ == '__main__':
