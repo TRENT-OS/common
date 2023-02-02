@@ -83,6 +83,11 @@ def get_pyftdi_gpio(url):
     list_devices()
     pyftdi.ftdi.Ftdi.show_devices()
 
+    try:
+        pyftdi.ftdi.Ftdi.show_devices()
+    except Exception as e:
+        print(f'Exception for show_devices(): {e}')
+
     print(f'opening {url}')
     gpio_contoller = pyftdi.gpio.GpioAsyncController()
     gpio_contoller.configure(url, direction=0xFF)

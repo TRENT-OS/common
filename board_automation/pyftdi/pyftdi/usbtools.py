@@ -577,6 +577,11 @@ class UsbTools:
         except UnicodeDecodeError:
             # do not abort if EEPROM data is somewhat incoherent
             return ''
+        except ValueError as e:
+            # The device has no langid (permission issue, no string descriptors
+            # supported or device error)
+            print(f'usb_get_string {stridx} caused ValueError: {e}')
+            return ''
 
     @classmethod
     def find_backend(cls) -> IBackend:
