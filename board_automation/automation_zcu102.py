@@ -176,7 +176,7 @@ class Automation(object):
                 else:
                     self.print('Openocd started succesfully')
                     return 1
-        
+
         return -1
 
 
@@ -301,8 +301,8 @@ class Automation(object):
                 self.screen_session,
                 self.screen_session,
                 self.uart_baud_rate,
-                self.uart_device_id, 
-                self.board_output_log                         
+                self.uart_device_id,
+                self.board_output_log
             ), in_stream=False)
 
 

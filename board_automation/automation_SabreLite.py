@@ -158,4 +158,3 @@ class BoardRunner(board_automation.System_Runner):
     # interface board_automation.System_Runner, ToDo: implement UART
     def get_serial_socket(self):
         return self.board_setup.uart1
-
