@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 
-import os
 import time
-import pathlib
 
 from . import tools
 from . import board_automation

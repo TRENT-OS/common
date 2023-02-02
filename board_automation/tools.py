@@ -6,7 +6,6 @@ import os
 import pathlib
 import fcntl
 import socket
-import selectors
 import threading
 import time
 import datetime
