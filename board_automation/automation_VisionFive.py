@@ -60,6 +60,173 @@ class BoardSetup():
 
 
     #---------------------------------------------------------------------------
+    def test_cbus(self):
+        # Test FTDI C-Bus access
+        #
+        # pyftdi URL: ftdi://[vendor][:[product][:serial|:bus:address|:index]]/interface
+        #
+        # LC231X module supports GPIO and CBUS:
+        #   CBUS[0]: default EEPROM setting is TRISTATE, can become GPIO
+        #   CBUS[1]: LED (RX)
+        #   CBUS[2]: LED (TX)
+        #   CBUS[3]: default EEPROM setting is TRISTATE, can become GPIO
+        #   TXD:     GPIO_0
+        #   RXD:     GPIO_1
+        #   RTS:     GPIO_2
+        #   CTS:     GPIO_3
+        #   DTR:     GPIO_4
+        #   DSR:     GPIO_5
+        #   DCD:     GPIO_6
+        #   RI :     GPIO_7
+        #
+        #
+        # sd-wire uses a FT200XD, the SD card switch is controlled via CBUS0.
+        #
+        #    # register sd-wire device with pyftdi core, so we can use it
+        #    VID = 0x04e8 # SAMSUNG
+        #    PID = 0x6001 # FT200XD default is 0x6015. FTDI uses PID 0x6001
+        #                 #  for FT232 and FT245
+        #    ftdi.Ftdi.add_custom_vendor(VID_SAMSUNG, 'samsung')
+        #    ftdi.Ftdi.add_custom_product(VID_SAMSUNG, PID_SD_WIRE, 'sd_wire')
+        #
+        #    URL = f'ftdi://0x{VID:04x}:0x{PID:04x}:{serial}/1'
+        #
+        # Notes/Links
+        #
+        #  seems CBUG is supported by the kernel GPIO driver
+        #  https://www.crowdsupply.com/pylo/muart/updates/gpio-interfacing
+        #  https://stackoverflow.com/questions/30938991/access-gpio-sys-class-gpio-as-non-root
+
+        from . import wrapper_pyftdi
+        import pyftdi
+        import pyftdi.ftdi
+        import pyftdi.eeprom
+
+        print("devices (1):")
+        wrapper_pyftdi.list_devices()
+        #print("devices (2, needs root access?):")
+        #pyftdi.ftdi.Ftdi.show_devices('ftdi:///?')
+
+
+        def test_raw(vid, pid, sn):
+
+            # Author: Stefan Agner
+            # https://blog.printk.io/2019/04/control-ftdi-cbus-while-tty-is-open
+            #
+            # Control Transfers for CBUS access are possible without detaching
+            # the kernel driver for the USB/UART adapter
+            #
+            # FTDIs CBUS bitmode expect the following value:
+            #   CBUS Bits
+            #   3210 3210
+            #        |------ Output Control 0->LO, 1->HI
+            #   |----------- Input/Output   0->Input, 1->Output
+            #
+            # PyUSB control endpoint communication, see also:
+            # https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
+
+            import sys
+            import usb
+
+            def ftdi_set_bitmode(dev, bitmask):
+                BITMODE_CBUS = 0x20
+                SIO_SET_BITMODE_REQUEST = 0x0b
+
+                bmRequestType = usb.util.build_request_type(usb.util.CTRL_OUT,
+                                                            usb.util.CTRL_TYPE_VENDOR,
+                                                            usb.util.CTRL_RECIPIENT_DEVICE)
+                wValue = bitmask | (BITMODE_CBUS << 8)
+                dev.ctrl_transfer(bmRequestType, SIO_SET_BITMODE_REQUEST, wValue)
+
+            dev = usb.core.find(custom_match = lambda d: \
+                                                  d.idVendor==vid and
+                                                  d.idProduct==pid and
+                                                  d.serial_number==sn)
+            # Set CBUS2/3 high...
+            ftdi_set_bitmode(dev, 0xCC)
+            time.sleep(1)
+            # Set CBUS2/3 low...
+            ftdi_set_bitmode(dev, 0xC0)
+            # Set CBUS2/3 back to tristate
+            ftdi_set_bitmode(dev, 0x00)
+
+        print("FTDI CBUS test_raw")
+        test_raw(0x0403, 0x6015, 'FT43WWWA')
+
+        print("FTDI CBUS test URL")
+
+        #URL = 'ftdi://ftdi:232h:1/1'
+        URL = 'ftdi://ftdi:ft-x/1'
+        #URL = 'ftdi://ftdi:ft-x:FT43WWWA/1' #(LC231X)
+
+        def gpio_cbus(url):
+            gpio = wrapper_pyftdi.get_pyftdi_cbus_gpio(url)
+            eeprom = pyftdi.eeprom.FtdiEeprom()
+            eeprom.connect(gpio.ftdi)
+            if (9 != eeprom.cbus_mask):
+                print('cbus_pins: ', eeprom.cbus_pins)
+                print('cbus_mask: ', eeprom.cbus_mask)
+                print('EEPROM:')
+                eeprom.dump_config()
+                #print('change EEPROM, CBUS[0,3] = GPIO')
+                #eeprom.set_property('cbus_func_0', 'GPIO')
+                #eeprom.set_property('cbus_func_3', 'GPIO')
+                #eeprom.dump_config()
+                #eeprom.commit(dry_run=False)
+            return gpio
+
+        gpio = gpio_cbus(URL)
+
+        #gpio.ftdi.set_cbus_direction(mask=0xf, direction=0x0)
+        #print(f'read 0x{gpio.ftdi.get_cbus_gpio():x}')
+        #gpio.ftdi.set_cbus_direction(mask=0xf, direction=0xf)
+        #gpio.ftdi.set_cbus_gpio(0xf)
+
+        while True:
+            print('.')
+            gpio.write(0)
+            time.sleep(3)
+            gpio.write(0xF)
+            time.sleep(0.3)
+        #
+        # for n in range(0,4):
+        #     print(f'{n}')
+        #     gpio.write(0)  # set all CBUSx to 0
+        #     time.sleep(0.5)
+        #     gpio.write(1 << n)  # set CBUSn = 1
+        #     #print(f'{gpio.read():x}')
+        #     time.sleep(0.2)
+        #
+        # relay_board = relay_control.Relay_Board(gpio, printer=myPrinter)
+        #
+        # for n in range(0,8):
+        #     print(f'{n}')
+        #     self.set_on(n)
+        #     time.sleep(0.5)
+        #     self.set_on(n)
+        #     #self.set_all_off()
+        #     time.sleep(0.2)
+        #
+        # relay_config = relay_control.Relay_Config({
+        #                         'POWER': relay_board.get_relay(4),
+        #                         'RESET': relay_board.get_relay(5),
+        #                         'SW1_1': relay_board.get_relay(6),
+        #                         'SW1_2': relay_board.get_relay(7)
+        #                     })
+        #
+        #
+        # req_relays = ['POWER', 'RESET', 'SW1_1', 'SW1_2']
+        # if not relay_config.check_relays_exist(req_relays):
+        #     raise Exception(
+        #             'relay configuration invalid, need {}'.format(req_relays))
+        #
+        # relay_config.set_all_off()
+        # relay_config.SW1_1.prepare_state_off()
+        # relay_config.SW1_2.prepare_state_off()
+        # relay_config.apply_state()
+
+
+    #---------------------------------------------------------------------------
     def cleanup(self):
         if self.gpio:
             self.gpio.set_direction(pins=0x0000, direction=0x0000)
@@ -87,13 +254,13 @@ class BoardAutomation():
                     name    = 'UART0',
                     printer = generic_runner.run_context.printer)
         self.monitors.append(monitor)
-        
+
         port = monitor.port
         while True:
-            #port.dtr = 1
+            port.dtr = 1
             port.rts = 1
             time.sleep(0.2)
-            #port.dtr = 0
+            port.dtr = 0
             port.rts = 0
             time.sleep(0.2)
 
@@ -176,12 +343,14 @@ class BoardAutomation():
     def power_on(self):
         self.print('no automation, power on manually')
         self.board_setup.gpio.write(0x0100)
+        #self.port.dtr = 0 # it's inverted
 
 
     #---------------------------------------------------------------------------
     def power_off(self):
         self.print('no automation, power off manually')
         self.board_setup.gpio.write(0x0000)
+        #self.port.dtr = 1 # it's inverted
 
 
     #---------------------------------------------------------------------------
@@ -237,6 +406,21 @@ class BoardRunner():
         uboot = self.board.get_uboot_automation(log)
 
         self.board.power_on()
+
+    #---------------------------------------------------------------------------
+    # called by generic_runner (board_automation.System_Runner)
+    def check_start_board_success(self, log):
+
+        while True:
+            self.board_setup.log_monitor.port.dtr = 1
+            self.board_setup.log_monitor.port.rts = 1
+            time.sleep(0.2)
+            self.board_setup.log_monitor.port.dtr = 0
+            self.board_setup.log_monitor.port.rts = 0
+            time.sleep(0.2)
+
+        test_cbus()
+
 
         ret = log.find_matches_in_lines([
             ( [ 'bootloader version:211102-0b86f96' ], 10 ),
