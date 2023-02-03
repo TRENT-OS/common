@@ -969,7 +969,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    def start_qemu(self, print_log):
+    def start_qemu(self):
 
         assert not self.is_qemu_running()
         qemu = get_qemu(
@@ -1091,13 +1091,13 @@ class QemuProxyRunner(board_automation.System_Runner):
                         log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
                         additional_params = self.additional_params,
                         printer = self.get_printer(),
-                        print_log = print_log)
+                        print_log = self.run_context.print_log)
 
         if not qemu_proc:
             raise Exception('could not start QEMU')
         self.process_qemu = qemu_proc
 
-        if print_log:
+        if self.run_context.print_log:
             # now that a QEMU process exists, start the monitor thread. The
             # checker function ensures it automatically terminates when the
             # QEMU process terminates. We use an infinite timeout, as we don't
@@ -1131,7 +1131,7 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    def start_proxy(self, print_log):
+    def start_proxy(self):
 
         # QEMU must be running, but not Proxy and the proxy params must exist
         assert self.is_qemu_running()
@@ -1172,14 +1172,14 @@ class QemuProxyRunner(board_automation.System_Runner):
         self.print(f'  proxy stdout: {self.process_proxy.log_file_stdout}')
         self.print(f'  proxy stderr: {self.process_proxy.log_file_stderr}')
 
-        self.process_proxy.start(print_log)
+        self.process_proxy.start(self.run_context.print_log)
 
 
     #----------------------------------------------------------------------------
     # interface board_automation.System_Runner
-    def do_start(self, print_log):
+    def do_start(self):
 
-        self.start_qemu(print_log)
+        self.start_qemu()
 
         # we used to have a sleep() here to give the QEMU process some fixed
         # time to start, the value was based on trial and error. However, this
@@ -1190,7 +1190,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # non-responsiveness must be taken into account anywhere.
 
         if self.proxy_cfg_str:
-            self.start_proxy(print_log)
+            self.start_proxy()
 
 
     #---------------------------------------------------------------------------

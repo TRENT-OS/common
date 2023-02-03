@@ -122,7 +122,7 @@ class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
     # interface board_automation.System_Runner
-    def do_start(self, print_log):
+    def do_start(self):
 
         # make sure the board if powered off
         self.board.power_off()
@@ -143,7 +143,7 @@ class BoardRunner(board_automation.System_Runner):
         # the power on
         self.board_setup.log_monitor.start(
             log_file = self.system_log_file.name,
-            print_log = print_log)
+            print_log = self.run_context.print_log)
         time.sleep(0.1)
 
         self.board.boot_internal()

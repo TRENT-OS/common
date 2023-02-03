@@ -354,7 +354,7 @@ class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
     # interface board_automation.System_Runner
-    def do_start(self, print_log):
+    def do_start(self):
         self.board.switch_sd_card_board()
 
         time.sleep(1)

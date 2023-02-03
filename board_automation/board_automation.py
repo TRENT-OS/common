@@ -87,11 +87,8 @@ class System_Runner():
 
     #---------------------------------------------------------------------------
     # sub-classes shall not overwrite this
-    def start(self, print_log = None):
-        if print_log is None:
-            print_log = self.run_context.print_log
-
-        self.do_start(print_log)
+    def start(self):
+        self.do_start()
 
 
     #---------------------------------------------------------------------------
@@ -105,7 +102,7 @@ class System_Runner():
 
     #---------------------------------------------------------------------------
     # sub-classes must implement this
-    def do_start(self, print_log):
+    def do_start(self):
         raise Exception('implement me')
 
 
