@@ -87,6 +87,15 @@ class BoardAutomation():
                     name    = 'UART0',
                     printer = generic_runner.run_context.printer)
         self.monitors.append(monitor)
+        
+        port = monitor.port
+        while True:
+            #port.dtr = 1
+            port.rts = 1
+            time.sleep(0.2)
+            #port.dtr = 0
+            port.rts = 0
+            time.sleep(0.2)
 
 
     #---------------------------------------------------------------------------
@@ -226,6 +235,7 @@ class BoardRunner():
         self.board.start_system_log()
         log = self.generic_runner.get_system_log_line_reader()
         uboot = self.board.get_uboot_automation(log)
+
         self.board.power_on()
 
         ret = log.find_matches_in_lines([
