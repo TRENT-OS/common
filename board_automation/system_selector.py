@@ -7,7 +7,7 @@ from . import automation_SabreLite
 from . import automation_RasPi
 from . import automation_zcu102
 from . import automation_OdroidC2
-
+from . import automation_VisionFive
 
 #-------------------------------------------------------------------------------
 def get_test_runner(run_context):
@@ -22,6 +22,15 @@ def get_test_runner(run_context):
     if new_plat is not None:
         print(f'translating PLATFORM: {run_context.platform} -> {new_plat}')
         run_context.platform = new_plat
+
+    #########################################################################
+    # This is a crude hack for testing things. We have no sel4 built yet.
+    # additional_params is not used
+    generic_runner = board_automation.System_Runner(run_context)
+    board_runnner = automation_VisionFive.get_BoardRunner(generic_runner)
+    generic_runner.set_board_runner(board_runnner)
+    return generic_runner    
+    #########################################################################
 
     boards = {
         automation_QEMU: [
