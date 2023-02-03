@@ -69,6 +69,46 @@ class Run_Context():
 #===============================================================================
 #===============================================================================
 
+class BootChecker:
+
+    #---------------------------------------------------------------------------
+    @staticmethod
+    def check_sel4(log):
+        ret = log.find_matches_in_lines([
+            # system has started, check that the ELF Loader started properly.
+            # This can take some time depending on the board's boot process
+            ('ELF-loader started', 10),
+            # give the ELF Loader 10 seconds to unpack the system. Some
+            # platforms print "Jumping to kernel-image entry point..." when
+            # ELF loader is done, but some don't. So all we can do is wait for
+            # some kernel message here.
+            ('Bootstrapping kernel', 10),
+            # check if the seL4 kernel booted properly, 5 secs should be enough
+            ('Booting all finished, dropped to user space', 5),
+        ])
+        if not ret.ok:
+            raise Exception(f'sel4 boot string #{len(ret.items)-1} not found: {ret.get_missing()}')
+
+
+    #---------------------------------------------------------------------------
+    @staticmethod
+    def check_capdl_loader(log):
+        ret = log.find_matches_in_lines([
+            # the CapDL Loader runs a as root task. It should run immediately,
+            # so 2 secs should do.
+            ('Starting CapDL Loader...' , 2),
+            # it takes some time for the CapDL Loader to set up the system,
+            # especially if there is a lot of output on the UART, where the
+            # baudrate setting slows things down. So let's give it 20 seconds.
+            ('CapDL Loader done, suspending...', 20),
+        ])
+        if not ret.ok:
+            raise Exception(f'CapDL Loader string #{len(ret.items)-1} not found: {ret.get_missing()}')
+
+
+#===============================================================================
+#===============================================================================
+
 class System_Runner():
 
     #---------------------------------------------------------------------------
@@ -161,45 +201,27 @@ class System_Runner():
         if self.run_context.boot_mode == BootMode.BARE_METAL:
             return
 
+        # The initial boot output of a bare-metal system is fully custom, this
+        # should be handled by the board specific code. Ideally, we'd get a
+        # log reader now, that has consumed all specific log, so we just see
+        # the ElfLoader starting seL4. This could be achieved with a new API
+        # like "log = self.board_runner.log". For now, we get the whole log
+        # and just hope there are no accidental collisions with similar
+        # messages.
         log = self.get_system_log_line_reader()
 
-        ret = log.find_matches_in_lines([
+        BootChecker.check_sel4(log)
 
-            # system has started, check that the ELF Loader started properly.
-            # This can take some time depending on the board's boot process
-            ('ELF-loader started', 10),
 
-            # give the ELF Loader 10 seconds to unpack the system. Some
-            # platforms print "Jumping to kernel-image entry point..." when
-            # ELF loader is done, but some don't. So all we can do is wait for
-            # some kernel message here.
-            ('Bootstrapping kernel', 10),
-
-            # check if the seL4 kernel booted properly, 5 secs should be enough
-            ('Booting all finished, dropped to user space', 5),
-        ])
-
-        if not ret.ok:
-            raise Exception(f'boot string #{len(ret.items)-1} not found: {ret.get_missing()}')
-
-        # There is no CapDL loader in a native system.
         if self.run_context.boot_mode == BootMode.SEL4_NATIVE:
             return
 
-        ret = log.find_matches_in_lines([
+        BootChecker.check_capdl_loader(log)
 
-            # the CapDL Loader runs a as root task. It should run immediately,
-            # so 2 secs should do.
-            ('Starting CapDL Loader...', 2),
+        if self.run_context.boot_mode == BootMode.SEL4_CAMKES:
+            return
 
-            # it takes some time for the CapDL Loader to set up the system,
-            # especially if there is a lot of output on the UART, where the
-            # baudrate setting slows things down. So let's give it 20 seconds.
-            ('CapDL Loader done, suspending...', 20),
-        ])
-
-        if not ret.ok:
-            raise Exception(f'CapDL Loader string #{len(ret.items)-1} not found: {ret.get_missing()}')
+        raise Exception(f'unsupported boot mode: #{self.run_context.boot_mode}')
 
 
     #---------------------------------------------------------------------------
