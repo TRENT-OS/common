@@ -345,11 +345,10 @@ class Automation():
 class BoardRunner(board_automation.System_Runner):
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context, additional_params):
+    def __init__(self, run_context):
 
         super().__init__(run_context, None)
         self.board = Automation(self.run_context.log_dir, run_context.printer)
-        self.additional_params = additional_params
 
 
     #---------------------------------------------------------------------------
@@ -369,7 +368,7 @@ class BoardRunner(board_automation.System_Runner):
         time.sleep(1)
         self.process_gdb = self.board.start_gdb(
                             self.run_context.system_image,
-                            self.additional_params)
+                            self.run_context.additional_params)
 
         time.sleep(10)
         self.board.extract_log()

@@ -889,13 +889,9 @@ class QemuProxyRunner(board_automation.System_Runner):
     port_cnt_lock = threading.Lock()
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context, proxy_cfg_str = None, additional_params = None):
+    def __init__(self, run_context):
 
         super().__init__(run_context, None)
-
-        self.sd_card_size = run_context.sd_card_size
-        self.proxy_cfg_str = proxy_cfg_str
-        self.additional_params = additional_params
 
         # attach to QEMU UART via TCP bridge
         self.bridge = TcpBridge(printer=self.get_printer())
@@ -1072,7 +1068,7 @@ class QemuProxyRunner(board_automation.System_Runner):
                     self.run_context.resource_dir,
                     'zcu102_sd_card'),
                 self.run_context.log_dir)
-        elif self.sd_card_size and (self.sd_card_size > 0):
+        elif self.run_context.sd_card_size and (self.run_context.sd_card_size > 0):
             # SD card (might be ignored if target does not support this)
             machine = qemu.get_machine()
             if (machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
@@ -1082,14 +1078,14 @@ class QemuProxyRunner(board_automation.System_Runner):
                 # ToDo: maybe we should create a copy here and not
                 #       modify the original file...
                 with open(sd_card_image, 'wb') as f:
-                    f.truncate(self.sd_card_size)
+                    f.truncate(self.run_context.sd_card_size)
                 qemu.add_sdcard_from_image(sd_card_image)
 
         # start QEMU
         qemu_proc = qemu.start(
                         log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
                         log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
-                        additional_params = self.additional_params,
+                        additional_params = self.run_context.additional_params,
                         printer = self.get_printer(),
                         print_log = self.run_context.print_log)
 
@@ -1136,9 +1132,9 @@ class QemuProxyRunner(board_automation.System_Runner):
         # QEMU must be running, but not Proxy and the proxy params must exist
         assert self.is_qemu_running()
         assert not self.is_proxy_running()
-        assert self.proxy_cfg_str
+        assert isinstance(self.run_context.proxy_config, str)
 
-        arr = self.proxy_cfg_str.split(',')
+        arr = self.run_context.proxy_config.split(',')
         proxy_app = arr[0]
         serial_qemu_connection = arr[1] if (1 != len(arr)) else 'TCP'
 
@@ -1189,7 +1185,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         # also closer to dealing with physical hardware, where failures and
         # non-responsiveness must be taken into account anywhere.
 
-        if self.proxy_cfg_str:
+        if self.run_context.proxy_config is not None:
             self.start_proxy()
 
 

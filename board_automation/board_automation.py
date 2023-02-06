@@ -30,16 +30,22 @@ class Run_Context():
         platform,
         system_image,
         sd_card_size,
-        printer = None,
-        print_log = False):
+        printer           = None,
+        print_log         = False,
+        boot_mode         = BootMode.BARE_METAL,
+        proxy_config      = None,
+        additional_params = None):
 
-        self.log_dir      = log_dir
-        self.resource_dir = resource_dir
-        self.platform     = platform
-        self.system_image = system_image
-        self.sd_card_size = sd_card_size
-        self.printer      = printer
-        self.print_log    = print_log
+        self.log_dir           = log_dir
+        self.resource_dir      = resource_dir
+        self.platform          = platform
+        self.system_image      = system_image
+        self.sd_card_size      = sd_card_size
+        self.printer           = printer
+        self.print_log         = print_log
+        self.boot_mode         = boot_mode
+        self.proxy_config      = proxy_config
+        self.additional_params = additional_params
 
 
 #===============================================================================
@@ -89,6 +95,7 @@ class System_Runner():
     # sub-classes shall not overwrite this
     def start(self):
         self.do_start()
+        self.check_start_success()
 
 
     #---------------------------------------------------------------------------
@@ -120,11 +127,11 @@ class System_Runner():
 
     #---------------------------------------------------------------------------
     # sub-classes may overwrite this
-    def check_start_success(self, boot_mode = BootMode.BARE_METAL):
+    def check_start_success(self):
 
         # The initial boot output of a bare-metal system is fully custom so it
         # is not necessary to perform any checks here.
-        if boot_mode == BootMode.BARE_METAL:
+        if self.run_context.boot_mode == BootMode.BARE_METAL:
             return
 
         (ret, idx, idx2) = self.system_log_match_multiple_sequences([
@@ -147,7 +154,7 @@ class System_Runner():
             raise Exception(f'boot string #{idx}.{idx2} not found')
 
         # There is no CapDL loader in a native system.
-        if boot_mode == BootMode.SEL4_NATIVE:
+        if self.run_context.boot_mode == BootMode.SEL4_NATIVE:
             return
 
         (ret, idx, idx2) = self.system_log_match_multiple_sequences([

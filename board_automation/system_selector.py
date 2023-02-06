@@ -11,15 +11,7 @@ from . import automation_zcu102
 
 
 #-------------------------------------------------------------------------------
-def get_test_runner(
-        log_dir,
-        resource_dir,
-        platform,
-        system_image,
-        proxy_config,
-        sd_card_size,
-        additional_params = None,
-        print_log = False ):
+def get_test_runner(run_context):
 
     # translate generic platform names
     translation_table = {
@@ -27,22 +19,12 @@ def get_test_runner(
         'qemu-arm-virt': 'qemu-arm-virt-a53',
         'qemu-riscv-virt': 'qemu-riscv-virt64'
     }
-    new_plat = translation_table.get(platform, None)
+    new_plat = translation_table.get(run_context.platform, None)
     if new_plat is not None:
-        print(f'translating PLATFORM: {platform} -> {new_plat}')
-        platform = new_plat
+        print(f'translating PLATFORM: {run_context.platform} -> {new_plat}')
+        run_context.platform = new_plat
 
-
-    run_context = board_automation.Run_Context(
-                    log_dir,
-                    resource_dir,
-                    platform,
-                    system_image,
-                    sd_card_size,
-                    tools.PrintSerializer(),
-                    print_log)
-
-    if (platform in [
+    if (run_context.platform in [
             'sabre',
             'zynqmp',
             'zynq7000',
@@ -56,28 +38,23 @@ def get_test_runner(
             'qemu-arm-virt-a72',
             'qemu-riscv-virt32',
             'qemu-riscv-virt64']):
-        return automation_QEMU.QemuProxyRunner(
-                        run_context,
-                        proxy_config,
-                        additional_params)
+        return automation_QEMU.QemuProxyRunner(run_context)
 
-    if (platform == 'sabre-hw'):
+    if (run_context.platform == 'sabre-hw'):
         return automation_SabreLite.BoardRunner(
                         run_context,
                         automation_SabreLite_boardSetup.Board_Setup(
                             run_context.printer))
 
-    if (platform == 'rpi3'):
+    if (run_context.platform == 'rpi3'):
         return automation_RasPi.BoardRunner(
                         run_context,
                         automation_RasPi_boardSetup.Board_Setup(
                             run_context.printer))
 
-    if (platform in [
+    if (run_context.platform in [
             'migv',
             'zcu102']):
-        return automation_zcu102.BoardRunner(
-                        run_context,
-                        additional_params)
+        return automation_zcu102.BoardRunner(run_context)
 
-    raise Exception(f'unsupported platform: {platform}')
+    raise Exception(f'unsupported platform: {run_context.platform}')
