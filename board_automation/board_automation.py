@@ -149,8 +149,14 @@ class System_Runner():
         if self.board_runner is None:
             raise Exception('no board specific runner set')
 
-        # This may call startProxy()
-        self.board_runner.start()
+        try:
+            # This may call startProxy()
+            self.board_runner.start()
+        except:
+            print('flush log after board boot failure')
+            time.sleep(1)
+            self.get_system_log_line_reader().flush()
+            raise
 
         if self.run_context.boot_mode == BootMode.BARE_METAL:
             return
@@ -195,6 +201,8 @@ class System_Runner():
 
     #---------------------------------------------------------------------------
     def stop(self):
+
+        self.get_system_log_line_reader().flush()
 
         if self.proxy:
             self.proxy.stop()
