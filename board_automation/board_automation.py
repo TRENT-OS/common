@@ -161,42 +161,45 @@ class System_Runner():
         if self.run_context.boot_mode == BootMode.BARE_METAL:
             return
 
-        (ret, idx, idx2) = self.system_log_match_multiple_sequences([
+        log = self.get_system_log_line_reader()
+
+        ret = log.find_matches_in_lines([
+
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
-            ( [ 'ELF-loader started' ], 10 ),
+            ('ELF-loader started', 10),
 
             # give the ELF Loader 10 seconds to unpack the system. Some
             # platforms print "Jumping to kernel-image entry point..." when
             # ELF loader is done, but some don't. So all we can do is wait for
             # some kernel message here.
-            ( [ 'Bootstrapping kernel' ], 10 ),
+            ('Bootstrapping kernel', 10),
 
             # check if the seL4 kernel booted properly, 5 secs should be enough
-            ( [ 'Booting all finished, dropped to user space' ], 5),
+            ('Booting all finished, dropped to user space', 5),
         ])
 
-        if not ret:
-            raise Exception(f'boot string #{idx}.{idx2} not found')
+        if not ret.ok:
+            raise Exception(f'boot string #{len(ret.items)-1} not found: {ret.get_missing()}')
 
         # There is no CapDL loader in a native system.
         if self.run_context.boot_mode == BootMode.SEL4_NATIVE:
             return
 
-        (ret, idx, idx2) = self.system_log_match_multiple_sequences([
+        ret = log.find_matches_in_lines([
 
             # the CapDL Loader runs a as root task. It should run immediately,
             # so 2 secs should do.
-            ( [ 'Starting CapDL Loader...' ], 2),
+            ('Starting CapDL Loader...', 2),
 
             # it takes some time for the CapDL Loader to set up the system,
             # especially if there is a lot of output on the UART, where the
             # baudrate setting slows things down. So let's give it 20 seconds.
-            ( [ 'CapDL Loader done, suspending...' ], 20),
+            ('CapDL Loader done, suspending...', 20),
         ])
 
-        if not ret:
-            raise Exception(f'CapDL Loader string #{idx}.{idx2} not found')
+        if not ret.ok:
+            raise Exception(f'CapDL Loader string #{len(ret.items)-1} not found: {ret.get_missing()}')
 
 
     #---------------------------------------------------------------------------
@@ -248,6 +251,13 @@ class System_Runner():
         return self.system_log_file.get_line_reader(timeout)
 
 
+    #-------------------------------------------------------------------------------
+    # This is a convenience function.
+    def system_log_match(self, match_obj):
+        log = self.get_system_log_line_reader()
+        return log.find_matches_in_lines(match_obj)
+
+
     #---------------------------------------------------------------------------
     # This function is a candidate for deprecation, as there are only few cases
     # where the raw non-blocking handle it needed. Furthermore, this uses an
@@ -262,6 +272,8 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
+    # This function is DEPRECATED. The generic string matching API from the line
+    # reader provided by get_system_log_line_reader() is much more flexible.
     def system_log_match_sequence(self, str_arr, timeout_sec = 0):
         log = self.get_system_log_line_reader(timeout_sec)
         for idx, string in enumerate(str_arr):
@@ -276,6 +288,8 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
+    # This function is DEPRECATED. The generic string matching API from the line
+    # reader provided by get_system_log_line_reader() is much more flexible.
     def system_log_match_multiple_sequences(self, seq_arr):
         log = self.get_system_log_line_reader()
         for idx, (str_arr, timeout_sec) in enumerate(seq_arr):

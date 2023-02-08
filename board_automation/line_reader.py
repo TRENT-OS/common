@@ -179,6 +179,125 @@ class Stream_Line_Reader():
         return line
 
 
+    #---------------------------------------------------------------------------
+    # obj can be a
+    # - primitive type
+    #   - plain string
+    #   - compiled regex
+    # - a (ordered) list of primitive types to match in the given order
+    # - a (unordered) set of primitive types to match in any order
+    # - tuple (obj, timeout_sec), where obj can be a primitive type or a
+    #    a list/set of primitive types.
+    # - list of tupels, where each tuple can contain a list or set of primitive
+    #    types
+    def find_matches_in_lines(self, obj):
+
+        @dataclasses.dataclass
+        class Ctx:
+            ok: bool = False
+
+        @dataclasses.dataclass
+        class CtxList(Ctx):
+            items: list = None # dataclasses.field(default_factory=list)
+            def get_missing(self):
+                if self.ok: return None
+                e = items[-1]
+                if isinstance(e, CtxItemMissing): return e.missing
+                return e.get_missing()
+
+        @dataclasses.dataclass
+        class CtxItemMatch(Ctx):
+            match: str = None
+            line_offset: int = None
+
+        @dataclasses.dataclass
+        class CtxItemMissing(Ctx):
+            missing: str = None
+            def get_missing(self):
+                return None if self.ok else self.missing
+
+        # For a tuple it must be (obj, timeout_sec).
+        if isinstance(obj, tuple):
+            assert len(obj) == 2
+            (sub_obj, timeout_sec) = obj
+            self.set_timeout(timeout_sec)
+            obj = sub_obj
+
+        # For a list we just call us recursively for each element. That allows
+        # even having lists of tupels of lists ...
+        if isinstance(obj, list):
+            items = []
+            for idx, obj in enumerate(obj):
+                ret = self.find_matches_in_lines(obj)
+                items.append(ret)
+                if not ret.ok:
+                    return CtxList(ok=False, items=items)
+            # If we arrive here, we are done with the list and all items were
+            # found.
+            return CtxList(ok=True, items=items)
+
+        # For a set, the order of the items does not matter, but all elements
+        # must match eventually.
+        if isinstance(obj, set):
+            items = []
+            # Make a copy of the set as list, in the copy we will remove the
+            # items we have found. Removing by index works in lists only, but
+            # not in sets
+            obj_remaining = list(obj)
+            for idx, line in enumerate(self):
+                # Iterate over the set to check if we have a match. We can't
+                # delete elements from the what we are looping over, so we need
+                # another copy for the looping. This is acceptable, because we
+                # expect the number of expressions to search for to be quite
+                # small.
+                regex_match = None
+                for pos, obj in enumerate(obj_remaining):
+                    if isinstance(obj, str):
+                        if obj in line:
+                            break
+                    else:
+                        mo = obj.search(line)
+                        if mo:
+                            regex_match = mo.group(0)
+                            break
+                else: # no break, nothing in the set matched
+                    continue
+                # We have found a match. If this was the last one remaining in
+                # the set then we are done.
+                items.append( CtxItemMatch(ok=True, line_offset=idx,
+                                           match=regex_match) )
+
+                obj_remaining.pop(pos)
+                if not obj_remaining:
+                    return CtxList(ok=True, items=items)
+            # If we arrive here, we could not find all strings from the set.
+            return CtxItemMissing(ok=False, missing=list(obj_remaining))
+
+        # If we are here, it must be a string or a compiled regex. We only check
+        # for the string type explicitly, anything else passed here must just
+        # behave like a compiled regex, we don't care exactly what it is.
+
+        is_str = isinstance(obj, str)
+        for idx, line in enumerate(self):
+            # Note that idx is relative to the current enumerator. It is not the
+            # absolute line number within the whole (file-)stream, because we
+            # can be called multiple times on the same stream, where it is not
+            # reset.
+            if is_str:
+                if obj in line:
+                    return CtxItemMatch(ok=True, line_offset=idx)
+            else:
+                mo = obj.search(line)
+                if mo:
+                    # Return the matched item also, so caller know what exactly
+                    # the regex matched.
+                    return CtxItemMatch(ok=True, line_offset=idx,
+                                        match=mo.group(0))
+
+        # If we arrive here, there was a timeout before we found a match.
+        return CtxItemMissing(ok=False, missing=obj)
+
+
 #===============================================================================
 #===============================================================================
 
