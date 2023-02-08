@@ -78,7 +78,7 @@ def list_devices(vid = 0x0403):
 
 
 #-------------------------------------------------------------------------------
-def get_pyftdi_gpio(url):
+def get_pyftdi_gpio(url, use_mpsse:bool = False):
 
     list_devices()
     pyftdi.ftdi.Ftdi.show_devices()
@@ -89,10 +89,15 @@ def get_pyftdi_gpio(url):
         print(f'Exception for show_devices(): {e}')
 
     print(f'opening {url}')
-    gpio_contoller = pyftdi.gpio.GpioAsyncController()
-    gpio_contoller.configure(url, direction=0xFF)
 
-    return gpio_contoller
+    if use_mpsse:
+        gpio = pyftdi.gpio.GpioMpsseController()
+        gpio.configure(url, frequency=10e6)
+        return gpio
+
+    gpio = pyftdi.gpio.GpioAsyncController()
+    gpio.configure(url, direction=0xFF)
+    return gpio
 
 
 #-------------------------------------------------------------------------------
