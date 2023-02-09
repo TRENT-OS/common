@@ -7,60 +7,7 @@ performed "online" on the log until the match condition happens or a timeout
 occurred
 """
 
-import re
-from board_automation import tools
-
-
-#------------------------------------------------------------------------------
-def read_line_from_log_file_with_timeout(f, timeout_sec=None):
-    """
-    Read a line from a logfile with a timeout. If the timeout is None, it is
-    disabled. The file handle must be opened in non-blocking mode.
-    Any timeout applies only when the function would block after all available
-    log data has been processed. As long as log data is available, it gets
-    processed, even if the timeout has actually expired already. Rationale is,
-    that it is assumed log data can be processed faster than it gets produced.
-    The purpose of this timeout is not to be a global timeout for the test
-    run, but just a limit how long to wait for new data.
-    """
-
-    timeout = tools.Timeout_Checker(timeout_sec)
-    line = ""
-
-    while True:
-        # readline() will return a string, which is terminated by "\n" for
-        # every line. For the last line of the file, it returns a string
-        # that is not terminated by "\n" to indicate the end of the file. If
-        # another task is appending data to the file, repeated calls to
-        # readline() may return multiple strings without "\n", each containing
-        # the new data written to the file.
-        #
-        #  loop iteration 1:     | line part |...
-        #  loop iteration 2:               | line part |...
-        #  ...
-        #  loop iteration k:                                | line+\n |
-        #
-        # There is a line break bug in some logs, "\n\r" is used instead of
-        # "\r\n". Universal newline handling accepts "\r", "\n" and "\r\n" as
-        # line break. We end up with some empty lines then as "\n\r" is taken
-        # as two line breaks.
-        data = f.readline()
-        line += data
-        if line.endswith("\n"):
-            return line
-
-        is_fragment = (len(line) > 0)
-
-        if timeout.has_expired():
-            # Fake a newline character if there was data.
-            return (line + "\n") if is_fragment else None
-
-        # Sleep and check again. This will sleep less than the requested time
-        # if the timeout has not enough time left. If there was at least some
-        # data, we might have been unlucky and just read while a line is about
-        # to be appended. Wait just 100ms in this case, otherwise wait 500ms
-        # because it seems we are really blocked waiting on new data to arrive.
-        timeout.sleep(0.1 if is_fragment else 0.5)
+import board_automation
 
 
 #------------------------------------------------------------------------------
@@ -84,19 +31,20 @@ def get_match_in_line(f, regex, timeout_sec=None):
     match(str): the matching string
     """
 
-    timeout = tools.Timeout_Checker(timeout_sec)
-    regex_compiled = re.compile( regex )
-    text = ""
-
-    while True:
-        line = read_line_from_log_file_with_timeout(f, timeout)
-        if line is None:
-            return (text, None)
-
+    text = ''
+    line_reader = board_automation.line_reader.Stream_Line_Reader(f, timeout_sec)
+    # We can't simply use line_reader.find_matches_in_lines() because we also
+    # have to capture the text. However, it seems most callers don't really care
+    # about the text, so this is just wasting resources. The whole function
+    # should get deprecated and the caller should use the Stream_Line_Reader
+    # directly. And capture the text if this is really needed.
+    for line in line_reader:
         text += line
-        mo = regex_compiled.search(line)
+        mo = regex.search(line)
         if mo:
             return (text, mo.group(0))
+
+    return (text, None)
 
 
 #-------------------------------------------------------------------------------
@@ -118,19 +66,23 @@ def check_log_match_sequence(f, expr_array, timeout_sec=None):
     timeout_sec(optional): timeout in seconds, None means disabled
     """
 
-    timeout = tools.Timeout_Checker(timeout_sec)
-    text = ""
-
+    text = ''
+    line_reader = board_automation.line_reader.Stream_Line_Reader(f, timeout_sec)
+    # We can't simply use line_reader.find_matches_in_lines() because we also
+    # have to capture the text. However, it seems most callers don't really care
+    # about the text, so this is just wasting resources. The whole function
+    # should get deprecated and the caller should use the Stream_Line_Reader
+    # directly. Or do this and capture the text if this is really needed.
     for expr in expr_array:
-        (text_part, match) = get_match_in_line(f, re.escape(expr), timeout)
-        text += text_part
-        if match is None:
-            print("No match for '%s'" % expr)
+        for line in line_reader:
+            text += line
+            if expr in line:
+                break;
+        else: # no break, all lines processed
+            print(f'No match for: {expr}')
             return (False, text, expr)
 
-        # We don't support any wildcards for now.
-        assert(match == expr)
-
+    # If we arrive here, all strings were found
     return (True, text, None)
 
 
@@ -152,26 +104,20 @@ def check_log_match_multiple_sequences(f, seq_expr_array):
     seq_expr_array: array of arrays with strings to match and timeout
     """
 
-    text = ""
-
-    for idx, (expr_array, timeout_sec) in enumerate(seq_expr_array):
-
-        timeout = tools.Timeout_Checker(timeout_sec)
-
+    text = ''
+    line_reader = board_automation.line_reader.Stream_Line_Reader(f)
+    for idx_seq, (expr_array, timeout_sec) in enumerate(seq_expr_array):
+        line_reader.set_timeout(timeout_sec)
         for expr in expr_array:
-
-            (text_part, match) = get_match_in_line(
-                                    f,
-                                    re.escape(expr),
-                                    timeout)
-            text += text_part
-            if match is None:
-                print('No match in sequence #{} for: {}'.format(idx, expr))
+            for line in line_reader:
+                text += line
+                if expr in line:
+                    break;
+            else: # no break, all lines processed
+                print(f'No match in sequence #{idx} for: {expr}')
                 return (False, text, expr, idx)
 
-            # We don't support any wildcards for now.
-            assert(match == expr)
-
+    # If we arrive here, all strings were found.
     return (True, text, None, 0)
 
 
@@ -195,111 +141,30 @@ def check_log_match_set(f, expr_array, timeout_sec=None):
     timeout_sec(optional): timeout in seconds, None means disabled
     """
 
-    timeout = tools.Timeout_Checker(timeout_sec)
-
-    expr_dict = {}
-    for expr in expr_array:
-        expr_dict[expr] = re.compile( re.escape(expr) )
-
-    text = ""
-
-    while True:
-        line = read_line_from_log_file_with_timeout(f, timeout)
-        if line is None:
-            return (False, text, expr_dict.keys())
-
+    text = ''
+    line_reader = board_automation.line_reader.Stream_Line_Reader(f, timeout_sec)
+    # Make a copy of the list, where we will remove the items we find.
+    arr_remaining = expr_array[:]
+    for line in line_reader:
         text += line
-
-        # We can't modify the dictionary while iterating over it, thus we
-        # create a list of items to remove.
-        remove_expr = [];
-        for expr in expr_dict:
-            regex_compiled = expr_dict[expr]
-            mo = regex_compiled.search(line)
-            if not mo:
-                continue
-
-            match = mo.group(0)
-            assert(match == expr) # We don't support any wildcards for now.
-            remove_expr.append(expr)
-
-        # Remove expression we have found.
-        if remove_expr:
-            for expr in remove_expr:
-                expr_dict.pop(expr)
-
-            if not expr_dict:
-                return (True, text, None)
-
-
-#-------------------------------------------------------------------------------
-def find_assert(f):
-    """
-    Check if current output already contains an assert failure of any type.
-    Start at the beginning and ensure that we set the file cursor back.
-    """
-
-    assert_re = re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)\n')
-    ret = None
-
-    # check the whole log received so far
-    f.seek(0)
-
-    read_next_line = True
-
-    while read_next_line:
-
-        line = f.readline()
-        # Lines end with a newline character (\n) unless it's the last line
-        # and the file doesn't end with a newline. This makes the return value
-        # unambiguous, if line is an empty string, the end of the file has been
-        # reached, any blank lines are represented by string containing only a
-        # single newline char.
-        if not line.endswith("\n"):
-            read_next_line = False
-            line += "\n" # assert_re still expects a newline char
-
-        mo = assert_re.search(line)
-        if mo:
-            ret = mo.group(0)
-            read_next_line = False
-
-
-    f.seek(0)
-
-    # return match on None
-    return ret
-
-#-------------------------------------------------------------------------------
-def check_result_or_assert(f, test_fn, test_args, timeout_sec=None):
-    """
-    Wait for a test result string or an assert specific to a test function
-    appears in the output file.
-    Any timeout applies only when the function would block after all available
-    log data has been processed. As long as log data is available, it gets
-    processed, even if the timeout has actually expired already. Rationale is,
-    that it is assumed log data can be processed faster than it gets produced.
-    The purpose of this timeout is not to be a global timeout for the test
-    run, but just a limit how long to wait for new data.
-    """
-
-    timeout = tools.Timeout_Checker(timeout_sec)
-
-    test_name = test_fn if test_args is None \
-                else "%s(%s)" % (test_fn, test_args)
-
-    assert_re = re.compile(r'Assertion failed: @%s: (.*)\n' % re.escape(test_name))
-    result_re = re.compile(r'!!! %s: OK\n' % re.escape(test_name))
-
-    while True:
-        line = read_line_from_log_file_with_timeout(f, timeout)
-        if line is None:
-            return (False, None)
-
-        mo = result_re.search(line)
-        if mo is not None:
-            return (True, None)
-
-        mo = assert_re.search(line)
-        if mo is not None:
-            return (False, mo.group(1))
+        # We can't delete elements from the list we are looping over, so do
+        # the looping over a copy. This is acceptable, because we expect
+        # the list of expressions to search for to be quite small.
+        arr_copy = arr_remaining[:]
+        for idx, obj in enumerate(arr_copy):
+            if isinstance(obj, str):
+                if obj in line:
+                    break
+            else:
+                mo = obj.search(line)
+                if mo:
+                    break
+        else: # no break, because no item matched
+            continue
+        # If we arrive here, there was a match. We are done if there are no
+        # more itemt to matchitemts left.
+        arr_remaining.pop(idx)
+        if not arr_remaining:
+            return (True, text, None)
+    # If we arrive here, we could not find all strings from the set.
+    return (False, text, arr_remaining)

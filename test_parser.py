@@ -1,15 +1,36 @@
-import pytest, logs
+"""
+Test parser
+
+Convenience function for parsing test logs.
+"""
+
+import re
+import pytest
+import board_automation
 
 
 #-------------------------------------------------------------------------------
+# This function is deprecated, because resetting a stream with 'f_out.seek(0)'
+# works for files only, other stream (e.g. from sockets) may not support this.
+# Seems what the callers really want is something that automatically checks
+# the log foir asserts. This could be implemented as a extension of the monitor
+# from tools.Log_File.start_monitor(), so there is a global list that collects
+# the asserts.
 def fail_on_assert(f_out):
     """
     If there is (so far) an assert in the log then fail the test
     """
 
-    failed_fn = logs.find_assert(f_out)
-    if failed_fn:
-        pytest.fail("Aborted because {} already failed".format(failed_fn))
+    # Check the whole stream we have to far, thus the timeout is set to 0
+    f_out.seek(0)
+    log = board_automation.line_reader.Stream_Line_Reader(stream = f_out)
+    ret = log.find_matches_in_lines(
+            ( re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)'), 0 ) )
+    assert_str = ret.match if ret.ok else None
+    f_out.seek(0)
+
+    if assert_str:
+        pytest.fail(f'Aborted, {assert_str}')
 
 
 #-------------------------------------------------------------------------------
@@ -39,39 +60,49 @@ def check_test(test_runner, timeout, test_fn, test_args=None, single_thread=True
 
     __tracebackhide__ = True
 
-    f_out = test_runner.get_system_log()
-    iterations = occurrences
+    generic_assert_re = re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)')
 
-    while iterations > 0:
-        iterations = iterations - 1
+    test_name = test_fn if test_args is None else f'{test_fn}({test_args})'
 
-        failed_fn = logs.find_assert(f_out) if single_thread else None
+    result_re = re.compile(fr'!!! {re.escape(test_name)}: OK\n')
+    assert_re = re.compile(fr'Assertion failed: @{re.escape(test_name)}: (.*)\n')
 
-        # there is no point in using a timeout if we already know of a failure
-        (test_ok, test_assert) = logs.check_result_or_assert(
-                                    f_out,
-                                    test_fn,
-                                    test_args,
-                                    0 if failed_fn else timeout)
-        if test_ok:
-            if iterations > 0:
-                continue
-            else:
-                return True
+    log = test_runner.get_system_log_line_reader()
+    # The timeout is used multiple times, so ensure that a relative timeout
+    # works against a general deadline and does not restart each time it is
+    # used.
+    timeout = board_automation.tools.Timeout_Checker(timeout)
 
-        if test_assert:
-            pytest.fail(test_assert)
-            return False
+    while occurrences > 0:
+        occurrences -= 1
 
-        if failed_fn:
-            pytest.fail("Aborted because {} already failed".format(failed_fn))
-            return False
+        # Check the whole log for an assert. Set timeout for this iteration to 0
+        # if there was one, as further check don't need to wait if we already
+        # know of a failure.
+        failed_fn = None
+        iteration_timeout = timeout
+        if single_thread:
+            log2 = test_runner.get_system_log_line_reader()
+            ret = log2.find_matches_in_lines( (generic_assert_re, 0) )
+            if ret.ok:
+                failed_fn = ret.match
+                iteration_timeout = 0
 
-        # check the whole log file again for an assert
-        assert_msg = logs.find_assert(f_out)
-        if assert_msg:
-            pytest.fail("Timed out because {} failed".format(assert_msg))
-            return False
+        log.set_timeout(iteration_timeout)
+        for line in log:
+            mo = assert_re.search(line)
+            if mo is not None:
+                pytest.fail(mo.group(1))
+            mo = result_re.search(line)
+            if mo is not None:
+                break
+        else: # no break, we read all available lines and found no match
+            if failed_fn:
+                pytest.fail(f'Aborted because {failed_fn}')
+            # check the whole log again for an assert.
+            log2 = test_runner.get_system_log_line_reader()
+            ret = log2.find_matches_in_lines( (generic_assert_re, 0) )
+            if ret.ok:
+                pytest.fail(f'Timed out because {ret.match}')
 
-        pytest.fail("Timed out but no assertion was found")
-        return False
+            pytest.fail(f'Timed out but no assertion was found')

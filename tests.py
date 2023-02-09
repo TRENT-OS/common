@@ -1,45 +1,42 @@
-import logs
+#
+# This file is a candidate for deprecation. It contains convenience functions to
+# wrap things that were non-trivial once. However, the APIs have been improved,
+# so tests should implement the steps does in the wrapper function directly.
+#
+
+#-------------------------------------------------------------------------------
+def run_test_log_match_sequence(fixture, test_system, expr_list, timeout_sec=0):
+    """Take a list containing strings or compiles regular expressions and checks
+    if each entry matched in the given order."""
+
+    # Start the system, if it is not already running. Check if the general boot
+    # went well, or raise an exception otherwise to abort the test.
+    test_runner = fixture(test_system)
+
+    log = test_runner.get_system_log_line_reader()
+    ret = log.find_matches_in_lines( (expr_list, timeout_sec) )
+    if not ret.ok:
+        raise Exception(f'missing string #{len(ret.items)-1}: {ret.get_missing()}')
+
+    # There is no specific return value in success
 
 
 #-------------------------------------------------------------------------------
-def run_test_log_match_sequence(fixture, test_system, expr_array, timeout_sec=0):
-    """will take an array of regular expressions and perform the simple test.
-    The order of the elements in the array matters, must be the same order in
-    the log file"""
+def run_test_log_match_set(fixture, test_system, expr_set, timeout_sec=0):
+    """Take a set containing strings or compiles regular expressions (if a list
+    is passed, it will be concerted into a set internally), and checks if the
+    exists in the log. The order of the elements does not matter"""
 
-    # ToDo: this starts the system if it is not already running. We should have
-    #       a check here if the boot itself went well, so we don't count this
-    #       time against the actual test. Also, if the boot fails, we can abort
-    #       the test early already and do not wait the full test specific
-    #       timeout.
+    if isinstance(expr_set, list):
+        expr_set = set(expr_set)
+
+    # Start the system, if it is not already running. Check if the general boot
+    # went well, or raise an exception otherwise to abort the test.
     test_runner = fixture(test_system)
 
-    (ret, text, expr_fail) = logs.check_log_match_sequence(
-                                test_runner.get_system_log(),
-                                expr_array,
-                                timeout_sec)
+    log = test_runner.get_system_log_line_reader()
+    ret = log.find_matches_in_lines( (expr_set, timeout_sec) )
+    if not ret.ok:
+        raise Exception(f'missing strings: {ret.get_missing()}')
 
-    if not ret:
-        raise Exception(" missing: %s"%(expr_fail))
-
-
-#-------------------------------------------------------------------------------
-def run_test_log_match_set(fixture, test_system, expr_array, timeout_sec=0):
-    """will take an array of regular expressions and perform the simple test.
-    The order of the elements in the array does not matter, the matches just
-    have to be there in the log occurring at any time at the least once per
-    single expression"""
-
-    # ToDo: this starts the system if it is not already running. We should have
-    #       a check here if the boot itself went well, so we don't count this
-    #       time against the actual test. Also, if the boot fails, we can abort
-    #       the test early already and do not wait the full test specific
-    #       timeout.
-    test_runner = fixture(test_system)
-
-    (ret, text, expr_fail) = logs.check_log_match_set(
-                                test_runner.get_system_log(),
-                                expr_array,
-                                timeout_sec)
-    if not ret:
-        raise Exception(" missing: %s"%(expr_fail))
+    # There is no specific return value in success
