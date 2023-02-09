@@ -4,14 +4,12 @@ import sys
 import traceback
 import os
 import pathlib
-import fcntl
 import socket
 import threading
 import time
 import datetime
-import re
 import subprocess
-
+from . import line_reader
 
 #-------------------------------------------------------------------------------
 # implement "@class_or_instancemethod" attribute for methods
@@ -368,39 +366,28 @@ class Log_File():
 
 
     #---------------------------------------------------------------------------
-    # if the file does not exist, keep checking every 100 ms until the timeout
-    # has expired or the checker function says we can stop
-    def open_non_blocking(
-            self,
-            timeout = None,
-            newline = None, # use universal newline mode by default
-            mode = 'rt', # read-only text file
-            encoding = 'latin-1', # avoid utf-8 and stick to single-byte chars
-            checker_func = None ):
+    # this return a generator build on top of Stream_Line_Reader
+    def get_line_reader(self, timeout = None, checker_func = None):
+        return line_reader.File_Line_Reader(
+                    fileName = self.name,
+                    timeout = timeout,
+                    checker_func = checker_func)
 
+
+    #---------------------------------------------------------------------------
+    # Open the file in for reading in non-blocking mode. If the file does not
+    # exist, sleep a while unless timeout and try again. The function returns a
+    # file handle or 'None' on timeouts. It can raise exceptions on fatal
+    # errors.
+    def open_non_blocking(self):
+        line_reader = self.get_line_reader()
         while True:
+            stream = line_reader.open_stream()
+            if stream is not None:
+                assert not stream.closed
+                return stream
 
-            if os.path.isfile(self.name):
-                # Try to open the file for reading. This return a handle or
-                # raises an exception on error
-                f = open(self.name, mode=mode, encoding=encoding,
-                         newline=newline)
-                assert f is not None
-                fd = f.fileno()
-                flag = fcntl.fcntl(fd, fcntl.F_GETFL)
-                fcntl.fcntl(fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
-                return f
-
-            if not timeout or timeout.has_expired():
-                return None
-
-            # wait and try again. Using 100 ms seems a good trade-off here, so
-            # we don't block for too long or cause much CPU load
-            timeout.sleep(0.1)
-
-            # Check for custom abort after sleeping, as there could have been
-            # an asynchronous cancellation.
-            if checker_func and not checker_func():
+            if not line_reader.wait():
                 return None
 
 
@@ -410,159 +397,23 @@ class Log_File():
             printer,
             checker_func = None):
 
-        #-----------------------------------------------------------------------
+        # The line reader uses an infinite timeout by default.
+        log = self.get_line_reader(checker_func = checker_func)
+
+        # Monitoring runs in a separate thread. The log file may not even exist,
+        # it gets created when data is written to it. The line reader can handle
+        # this case.
+        # Unfortunately, there is a line break bug in some logs, where "\n\r"
+        # (LF+CR) is used instead of "\r\n" (CR+LF). Universal newline handling
+        # only considers "\r", "\n" and "\r\n" as line break, thus "\n\r" is
+        # taken as two line breaks and we see a lot of empty lines in the logs.
+
         def monitoring_thread(thread):
-            # time starts ticking now, since the system is running. The file
-            # may not be created until any data is written into it, so
-            # successfully opening it can take a while.
             start = datetime.datetime.now()
-            f_log = self.open_non_blocking(
-                        timeout = Timeout_Checker.infinite(),
-                        checker_func = checker_func)
-            if not f_log:
-                # we see this when opening the file failed and we've finally
-                # reached the timeout or the checker function told us to stop
-                raise Exception('monitor failed, could not open: {}'.format(self.name))
-
-            with f_log:
-                is_abort = False
-                while not is_abort:
-                    line = None
-                    while True:
-                        # readline() returns a string terminated by "\n" for
-                        # every complete line. On timeout (ie. EOF reached),
-                        # there is no terminating "\n".
-                        chars_read = f_log.readline()
-                        if line is None:
-                            line = chars_read
-                        else:
-                            line += chars_read
-
-                        if line.endswith('\n'):
-                            line = line.rstrip('\n')
-                            # Unfortunately, there is a line break bug in some
-                            # logs, where "\n\r" (LF+CR) is used instead of
-                            # "\r\n" (CR+LF). Universal newline handling only
-                            # considers "\r", "\n" and "\r\n" as line break,
-                            # thus "\n\r" is taken as two line breaks and we
-                            # see a lot of empty lines in the logs
-                            break
-
-                        # could not read a complete line, check termination
-                        # request
-                        if checker_func and not checker_func():
-                            is_abort = True
-                            break
-
-                        # wait and try again. Using 100 ms seems a good
-                        # trade-off here, so we don't block for too long or
-                        # cause too much CPU load
-                        time.sleep(0.1)
-
-                    if line is not None:
-                        printer.print('[{}] {}'.format(
-                            datetime.datetime.now() - start,
-                            line))
-
-            # printer.print('[{}] monitor terminated for {}'.format(self, self.name))
-
+            for line in log:
+                delta = datetime.datetime.now() - start
+                if line.endswith('\n'):
+                    line = line.rstrip('\n')
+                printer.print(f'[{delta}] {line}')
 
         self.monitor_thread = run_in_thread(monitoring_thread)
-
-    #---------------------------------------------------------------------------
-    @classmethod
-    def do_find_match_in_lines(cls, hLog, regex, timeout = None):
-
-        regex_compiled = re.compile( regex )
-        line = ''
-
-        while True:
-
-            # if we've opened the file in non-blocking mode, this is a
-            # non-blocking read, ie if we read something not ending with '\n',
-            # it means we have reached the end of input
-            line += hLog.readline()
-            is_timeout = (timeout is None) or timeout.has_expired()
-            if (not line.endswith('\n')) and (not is_timeout):
-                # sleep 100 ms or what is left from the timeout. We can use any
-                # value here, 100 ms seem a good trade-off between blocking and
-                # just wasting CPU time.
-                timeout.sleep(0.1)
-
-            else:
-                mo = regex_compiled.search(line)
-                if mo:
-                    return mo.group(0)
-
-                if is_timeout:
-                    return None
-
-                line = ''
-
-
-    #---------------------------------------------------------------------------
-    @classmethod
-    def do_match_sequence(cls, hLog, str_arr, timeout = None):
-        for idx, expr in enumerate(str_arr):
-            regex = re.escape(expr)
-            match = cls.do_find_match_in_lines(hLog, regex, timeout)
-            if match is None:
-                return (False, idx)
-
-            # we don't support any wildcards for now
-            assert(match == expr)
-
-        # done with the sequence, all strings found
-        return (True, None)
-
-
-    #---------------------------------------------------------------------------
-    @classmethod
-    def do_match_multiple_sequences(cls, hLog, seq_arr, timeout = None):
-        for idx, (str_arr, timeout_sec) in enumerate(seq_arr):
-            # we already have the first timeout running, for every
-            # further element we set up a new timeout
-            if (idx > 0):
-                timeout = Timeout_Checker(timeout_sec)
-
-            (ret, idx2) = cls.do_match_sequence(hLog, str_arr, timeout)
-            if not ret:
-                return (False, idx, idx2)
-
-        # done with the array of sequences
-        return (True, None, None)
-
-
-    #---------------------------------------------------------------------------
-    def find_match_in_lines(self, regex, timeout = None):
-        hLog = self.open_non_blocking(timeout = timeout)
-        if not hLog:
-            raise Exception('could not open: {}'.format(self.name))
-
-        with hLog:
-            return self.do_find_match_in_lines(hLog, regex, timeout)
-
-
-    #---------------------------------------------------------------------------
-    def match_sequence(self, str_arr, timeout = None):
-        hLog = self.open_non_blocking(timeout = timeout)
-        if not hLog:
-            raise Exception('could not open: {}'.format(self.name))
-
-        with hLog:
-            return self.do_match_sequence(hLog, str_arr, timeout)
-
-
-    #---------------------------------------------------------------------------
-    def match_multiple_sequences(self, seq_arr):
-
-        # opening the file counts towards the first sequences timeout
-        (expr_array, timeout_sec) = seq_arr[0]
-        timeout = Timeout_Checker(timeout_sec)
-
-        hLog = self.open_non_blocking(timeout = timeout)
-        if not hLog:
-            raise Exception('could not open: {}'.format(self.name))
-
-        with hLog:
-            return self.do_match_multiple_sequences(hLog, seq_arr, timeout)

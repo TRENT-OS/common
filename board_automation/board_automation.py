@@ -234,17 +234,50 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
+    # Returns an iterator that yields the lines of the file until the timeout
+    # is reached. By default the timeout is infinite.
+    def get_system_log_line_reader(self, timeout = None):
+        return self.system_log_file.get_line_reader(timeout)
+
+
+    #---------------------------------------------------------------------------
+    # This function is a candidate for deprecation, as there are only few cases
+    # where the raw non-blocking handle it needed. Furthermore, this uses an
+    # infinite timeout by default, so it may block forever if the log file is
+    # not created due to a early failure when trying to start a board. For many
+    # use cases, the function get_system_log_line_reader() seems a much better
+    # choice, because the returned reader can then be used to iterate over the
+    # lines. It can also provide the (non-blocking) handle, if this is really
+    # needed.
     def get_system_log(self):
         return self.system_log_file.open_non_blocking()
 
 
     #---------------------------------------------------------------------------
     def system_log_match_sequence(self, str_arr, timeout_sec = 0):
-        return self.system_log_file.match_sequence(
-                    str_arr,
-                    tools.Timeout_Checker(timeout_sec))
+        log = self.get_system_log_line_reader(timeout_sec)
+        for idx, string in enumerate(str_arr):
+            assert isinstance(string, str)
+            for line in log:
+                if string in line:
+                    break
+            else:  # no break means timeout before we could find a match
+                return (False, idx)
+        # If we arrive here, all string could be matched
+        return (True, None)
 
 
     #---------------------------------------------------------------------------
     def system_log_match_multiple_sequences(self, seq_arr):
-        return self.system_log_file.match_multiple_sequences(seq_arr)
+        log = self.get_system_log_line_reader()
+        for idx, (str_arr, timeout_sec) in enumerate(seq_arr):
+            log.set_timeout(timeout_sec)
+            for idx2, string in enumerate(str_arr):
+                assert isinstance(string, str)
+                for line in log:
+                    if string in line:
+                        break
+                else: # no break means timeout before we could find a match
+                    return (False, idx, idx2)
+        # If we arrive here, all string could be matched
+        return (True, None, None)
