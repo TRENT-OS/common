@@ -379,8 +379,8 @@ class Log_File():
     # exist, sleep a while unless timeout and try again. The function returns a
     # file handle or 'None' on timeouts. It can raise exceptions on fatal
     # errors.
-    def open_non_blocking(self):
-        line_reader = self.get_line_reader()
+    def open_non_blocking(self, timeout = None):
+        line_reader = self.get_line_reader(timeout = timeout)
         while True:
             stream = line_reader.open_stream()
             if stream is not None:

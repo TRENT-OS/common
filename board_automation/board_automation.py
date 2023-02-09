@@ -249,8 +249,8 @@ class System_Runner():
     # choice, because the returned reader can then be used to iterate over the
     # lines. It can also provide the (non-blocking) handle, if this is really
     # needed.
-    def get_system_log(self):
-        return self.system_log_file.open_non_blocking()
+    def get_system_log(self, timeout = None):
+        return self.system_log_file.open_non_blocking(timeout)
 
 
     #---------------------------------------------------------------------------
