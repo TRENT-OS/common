@@ -581,7 +581,7 @@ class UsbTools:
             # The device has no langid (permission issue, no string descriptors
             # supported or device error)
             print(f'usb_get_string {stridx} caused ValueError: {e}')
-            return ''
+            return f'#{stridx}-err'
 
     @classmethod
     def find_backend(cls) -> IBackend:
