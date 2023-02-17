@@ -1123,7 +1123,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             self.bridge.connect_to_server(
                 '127.0.0.1',
                 self.qemu_uart_network_port,
-                Timeout_Checker(5))
+                5)
 
 
     #---------------------------------------------------------------------------
