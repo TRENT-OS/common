@@ -408,7 +408,6 @@ class Log_File():
     def start_monitor(
             self,
             printer,
-            timeout = None,
             checker_func = None):
 
         #-----------------------------------------------------------------------
@@ -418,7 +417,7 @@ class Log_File():
             # successfully opening it can take a while.
             start = datetime.datetime.now()
             f_log = self.open_non_blocking(
-                        timeout = timeout,
+                        timeout = Timeout_Checker.infinite(),
                         checker_func = checker_func)
             if not f_log:
                 # we see this when opening the file failed and we've finally
