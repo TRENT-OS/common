@@ -145,3 +145,24 @@ class UBootAutomation():
         self.check_env('ipaddr', board_ip_addr)
 
 
+    #---------------------------------------------------------------------------
+    #def load_y_modem(self, img):
+    #    with open(img, 'rb') as f:
+    #       file_content = f.read()
+    #
+    #    from . import ymodem
+    #
+    #    def sender_write(data, timeout=3):
+    #        print(f'write: {data}')
+    #        self.write_uart0(data)
+    #
+    #    def sender_read(size, timeout=3):
+    #        print(f'read {size}')
+    #        ret = log.stream.read(size)
+    #        print(f'read ({size}): {ret}')
+    #        return ret
+    #
+    #    sender = ymodem.Modem(sender_read, sender_write)
+    #    ret = sender.send([img])
+    #    print(ret)
+    #    self.funcWrite(file_content)
