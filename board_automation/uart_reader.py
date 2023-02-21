@@ -92,10 +92,7 @@ class TTY_USB():
     @tools.class_or_instance_method
     def find_device(self_or_cls, serial = None, usb_path = None):
 
-        dev_list = self_or_cls.get_and_print_device_list()
-
-        print(f'opening {usb_path}, {serial}')
-
+        dev_list = self_or_cls.get_device_list()
         my_device = None
 
         if serial is not None:
@@ -114,15 +111,21 @@ class TTY_USB():
             raise Exception('must specify device, serial and/or USB path')
 
         if not my_device:
+            sn_str = f'"{serial}"' if serial else '[n/a]'
+            path_str = f'USB path {usb_path}' if usb_path else '[n/a]'
+            print(f'could not find device at USB path {path_str}, s/n {sn_str}')
+            self_or_cls.get_and_print_device_list()
             raise Exception('device not found')
 
         if usb_path and (usb_path != my_device.usb_path):
+            self_or_cls.get_and_print_device_list()
             raise Exception(f'USB path different, expected {usb_path}, got {my_device.usb_path}')
 
         if serial and (serial != my_device.serial):
-            raise Exception(f'serial different, expected {serial}, got {my_device.serial}')
+            self_or_cls.get_and_print_device_list()
+            raise Exception(f'serial different, expected "{serial}", got "{my_device.serial}"')
 
-        sn = f's/n {dev.serial}' if dev.serial else '[no s/n]'
+        sn = f's/n "{dev.serial}"' if dev.serial else '[no s/n]'
         usb_path = my_device.usb_path or '[None]'
         print(f'using {my_device.device} ({sn}, USB path {usb_path})')
 
