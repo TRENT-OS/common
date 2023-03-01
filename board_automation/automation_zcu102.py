@@ -342,18 +342,22 @@ class Automation():
 #===============================================================================
 #===============================================================================
 
-class BoardRunner(board_automation.System_Runner):
+class BoardRunner():
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context):
+    def __init__(self, generic_runner):
 
-        super().__init__(run_context, None)
-        self.board = Automation(self.run_context.log_dir, run_context.printer)
+        self.generic_runner = generic_runner
+
+        printer = generic_runner.run_context.printer
+
+        self.board = Automation(self.generic_runner.run_context.log_dir,
+                                printer)
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner
-    def do_start(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def start(self):
         self.board.switch_sd_card_board()
 
         time.sleep(1)
@@ -367,8 +371,8 @@ class BoardRunner(board_automation.System_Runner):
 
         time.sleep(1)
         self.process_gdb = self.board.start_gdb(
-                            self.run_context.system_image,
-                            self.run_context.additional_params)
+                            self.generic_runner.run_context.system_image,
+                            self.generic_runner.run_context.additional_params)
 
         time.sleep(10)
         self.board.extract_log()
@@ -410,9 +414,23 @@ class BoardRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner
-    def do_cleanup(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def stop(self):
+        self.board.power_off()
+
+
+    #---------------------------------------------------------------------------
+    # called by generic_runner (board_automation.System_Runner)
+    def cleanup(self):
         if hasattr(self, 'process_gdb'):
             self.process_gdb.kill()
 
         self.board.cleanup()
+
+
+#===============================================================================
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+def get_BoardRunner(generic_runner):
+    return BoardRunner(generic_runner)

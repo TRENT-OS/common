@@ -879,7 +879,7 @@ class Additional_Param_Type(IntEnum):
 
 
 #-------------------------------------------------------------------------------
-class QemuProxyRunner(board_automation.System_Runner):
+class QemuProxyRunner():
     # to allow multi instance of this class we need to avoid insisting on the
     # same port. Therefore a base is established here but the port number used
     # is calculated every time an instance gets created (see code below). At the
@@ -889,9 +889,10 @@ class QemuProxyRunner(board_automation.System_Runner):
     port_cnt_lock = threading.Lock()
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context):
+    def __init__(self, generic_runner):
 
-        super().__init__(run_context, None)
+        self.generic_runner = generic_runner
+        self.run_context = generic_runner.run_context
 
         # attach to QEMU UART via TCP bridge
         self.bridge = TcpBridge(printer=self.get_printer())
@@ -1023,7 +1024,7 @@ class QemuProxyRunner(board_automation.System_Runner):
         if not has_syslog_on_uart_1:
             # UART 0 is syslog
             qemu.sys_log_setup(
-                self.system_log_file.name,
+                self.generic_runner.system_log_file.name,
                 self.qemu_uart_log_host,
                 self.qemu_uart_log_port,
                 0)
@@ -1040,7 +1041,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             assert 1 == len(qemu.config['serial_ports'])
             # UART 1 is syslog
             qemu.sys_log_setup(
-                self.system_log_file.name,
+                self.generic_runner.system_log_file.name,
                 self.qemu_uart_log_host,
                 self.qemu_uart_log_port,
                 1)
@@ -1083,8 +1084,8 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         # start QEMU
         qemu_proc = qemu.start(
-                        log_file_stdout = self.get_log_file_fqn('qemu_out.txt'),
-                        log_file_stderr = self.get_log_file_fqn('qemu_err.txt'),
+                        log_file_stdout = self.generic_runner.get_log_file_fqn('qemu_out.txt'),
+                        log_file_stderr = self.generic_runner.get_log_file_fqn('qemu_err.txt'),
                         additional_params = self.run_context.additional_params,
                         printer = self.get_printer(),
                         print_log = self.run_context.print_log)
@@ -1097,7 +1098,7 @@ class QemuProxyRunner(board_automation.System_Runner):
             # Now that a QEMU process exists, start the monitor thread. The
             # checker function ensures it automatically terminates when the
             # QEMU process terminates.
-            self.system_log_file.start_monitor(
+            self.generic_runner.system_log_file.start_monitor(
                 printer = self.get_printer(),
                 checker_func = lambda: self.is_qemu_running()
             )
@@ -1154,8 +1155,8 @@ class QemuProxyRunner(board_automation.System_Runner):
 
         self.process_proxy = process_tools.ProcessWrapper(
                                 cmd_arr,
-                                log_file_stdout = self.get_log_file_fqn('proxy_out.txt'),
-                                log_file_stderr = self.get_log_file_fqn('proxy_err.txt'),
+                                log_file_stdout = self.generic_runner.get_log_file_fqn('proxy_out.txt'),
+                                log_file_stderr = self.generic_runner.get_log_file_fqn('proxy_err.txt'),
                                 printer = self.get_printer(),
                                 name = 'Proxy'
                              )
@@ -1168,8 +1169,8 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #----------------------------------------------------------------------------
-    # interface board_automation.System_Runner
-    def do_start(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def start(self):
 
         self.start_qemu()
 
@@ -1186,13 +1187,14 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner: nothing special here
-    # def do_stop(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def stop(self):
+        pass
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner
-    def do_cleanup(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def cleanup(self):
         if self.is_proxy_running():
             #self.print('terminating Proxy...')
             self.process_proxy.terminate()
@@ -1207,7 +1209,15 @@ class QemuProxyRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner
+    # called by generic_runner (board_automation.System_Runner)
     def get_serial_socket(self):
         return None if self.is_proxy_running() \
                else self.bridge.get_source_socket()
+
+
+#===============================================================================
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+def get_BoardRunner(generic_runner):
+    return QemuProxyRunner(generic_runner)

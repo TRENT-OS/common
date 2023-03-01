@@ -54,7 +54,7 @@ class Run_Context():
 class System_Runner():
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context, board_setup = None):
+    def __init__(self, run_context):
 
         if run_context.system_image is None:
             raise Exception('ERROR: no system image given')
@@ -63,7 +63,7 @@ class System_Runner():
             raise Exception(f'ERROR: missing system image: {run_context.system_image}')
 
         self.run_context  = run_context
-        self.board_setup  = board_setup
+        self.board_runner = None
 
         process_tools.install_abort_handler(self.cleanup)
 
@@ -76,66 +76,37 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
-    # sub-classes shall not overwrite this
-    def cleanup(self):
-        if self.board_setup:
-            self.board_setup.cleanup()
+    def set_board_runner(self, board_runner):
+        if self.board_runner is not None:
+            raise Exception(f'board runner already set: {self.board_runner}')
 
-        self.do_cleanup()
+        self.board_runner = board_runner
 
 
     #---------------------------------------------------------------------------
-    # sub-classes may extend this
     def print(self, msg):
         if self.run_context.printer:
             self.run_context.printer.print(msg)
 
 
     #---------------------------------------------------------------------------
-    # sub-classes shall not overwrite this
+    def cleanup(self):
+        if self.board_runner is not None:
+               self.board_runner.cleanup()
+
+
+    #---------------------------------------------------------------------------
     def start(self):
-        self.do_start()
-        self.check_start_success()
 
+        if self.board_runner is None:
+            raise Exception('no board specific runner set')
 
-    #---------------------------------------------------------------------------
-    # sub-classes shall not overwrite this
-    def stop(self):
-        try:
-            self.do_stop()
-        finally:
-            self.cleanup()
+        self.board_runner.start()
 
-
-    #---------------------------------------------------------------------------
-    # sub-classes must implement this
-    def do_start(self):
-        raise Exception('implement me')
-
-
-    #---------------------------------------------------------------------------
-    # sub-classes may implement this
-    def do_stop(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    # sub-classes may implement this
-    def do_cleanup(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    # sub-classes may overwrite this
-    def check_start_success(self):
-
-        # The initial boot output of a bare-metal system is fully custom so it
-        # is not necessary to perform any checks here.
         if self.run_context.boot_mode == BootMode.BARE_METAL:
             return
 
         (ret, idx, idx2) = self.system_log_match_multiple_sequences([
-
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
             ( [ 'ELF-loader started' ], 10 ),
@@ -174,9 +145,24 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
-    # sub-classes may overwrite this if they provide a socket
+    def stop(self):
+        err = None
+        if self.board_runner is not None:
+            try:
+               self.board_runner.stop()
+            except Exception as e:
+                print(f'board runner stop exception: {e}')
+                err = e
+
+        self.cleanup()
+
+        if err is not None:
+            raise Exception(f'board cleanup failed: {err}')
+
+
+    #---------------------------------------------------------------------------
     def get_serial_socket(self):
-        return None
+        return self.board_runner.get_serial_socket()
 
 
     #---------------------------------------------------------------------------

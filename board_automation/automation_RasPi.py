@@ -4,6 +4,7 @@ import time
 
 from . import tools
 from . import board_automation
+from . import automation_RasPi_boardSetup
 
 
 #===============================================================================
@@ -64,26 +65,25 @@ class Automation():
 #===============================================================================
 #===============================================================================
 
-class BoardRunner(board_automation.System_Runner):
+class BoardRunner():
 
     #---------------------------------------------------------------------------
-    def __init__(self, run_context, board_setup):
-
-        super().__init__(run_context, board_setup)
-
-        self.board = Automation(
-                        board_setup.relay_config,
-                        run_context.printer)
+    def __init__(self, generic_runner):
+        self.generic_runner = generic_runner
+        printer = generic_runner.run_context.printer
+        self.board_setup = Board_Setup(printer)
+        self.board = Automation(self.board_setup.relay_config, printer)
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner, nothing special here
-    # def do_cleanup(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def cleanup(self):
+        self.board_setup.cleanup()
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner
-    def do_start(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def start(self):
 
         # make sure the board is powered off
         self.board.power_off()
@@ -95,15 +95,15 @@ class BoardRunner(board_automation.System_Runner):
         self.print('content of {}'.format(mp))
         tools.print_files_from_folder(mp)
 
-        self.board_setup.sd_wire.copy_file_to_card(self.run_context.system_image)
+        self.board_setup.sd_wire.copy_file_to_card(self.generic_runner.run_context.system_image)
 
         self.board_setup.sd_wire.unmount_and_switch_to_device(timeout_sec = 5)
 
         # now the board is ready to boot, enable the UART logger and switch
         # the power on
         self.board_setup.log_monitor.start(
-            log_file = self.system_log_file.name,
-            print_log = self.run_context.print_log)
+            log_file = self.generic_runner.run_context.system_log_file.name,
+            print_log = self.generic_runner.run_context.print_log)
 
         time.sleep(0.1)
 
@@ -111,10 +111,20 @@ class BoardRunner(board_automation.System_Runner):
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner: nothing special here
-    # def do_stop(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def stop(self):
+        self.board.power_off()
 
 
     #---------------------------------------------------------------------------
-    # interface board_automation.System_Runner: ToDo: implement UART
-    # def get_serial_socket(self):
+    # called by generic_runner (board_automation.System_Runner)
+    def get_serial_socket(self):
+        raise Exception('not implemented')
+
+
+#===============================================================================
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+def get_BoardRunner(generic_runner):
+    return BoardRunner(generic_runner)
