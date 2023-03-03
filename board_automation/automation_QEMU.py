@@ -1144,18 +1144,16 @@ class QemuProxyRunner():
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def stop(self):
-        pass
-
-
-    #---------------------------------------------------------------------------
-    # called by generic_runner (board_automation.System_Runner)
-    def cleanup(self):
-
+        self.bridge.stop_server()
         if self.is_qemu_running():
             #self.print('terminating QEMU...')
             self.process_qemu.terminate()
             self.process_qemu = None
 
+
+    #---------------------------------------------------------------------------
+    # called by generic_runner (board_automation.System_Runner)
+    def cleanup(self):
         self.bridge.shutdown()
 
 
