@@ -1129,19 +1129,11 @@ class QemuProxyRunner():
         # QEMU must be running, but not Proxy and the proxy params must exist
         assert self.is_qemu_running()
         assert not self.is_proxy_running()
-        assert isinstance(self.run_context.proxy_config, str)
-
-        arr = self.run_context.proxy_config.split(',')
-        proxy_app = arr[0]
-        serial_qemu_connection = arr[1] if (1 != len(arr)) else 'TCP'
-
+        proxy_app = self.run_context.proxy_binary
         assert proxy_app is not None
+        assert isinstance(proxy_app, str)
         if not os.path.isfile(proxy_app):
-            raise Exception(f'ERROR: missing proxy app: {proxy_app}')
-
-        if (serial_qemu_connection != 'TCP'):
-            raise Exception(
-                f'ERROR: invalid Proxy/QEMU_connection mode: {serial_qemu_connectio}')
+            raise Exception(f'ERROR: missing proxy binary: {proxy_app}')
 
         # start the bridge between QEMU and the Proxy
         self.bridge.start_server(self.proxy_network_port)
@@ -1183,7 +1175,7 @@ class QemuProxyRunner():
         # also closer to dealing with physical hardware, where failures and
         # non-responsiveness must be taken into account anywhere.
 
-        if self.run_context.proxy_config is not None:
+        if self.run_context.use_proxy:
             self.start_proxy()
 
 

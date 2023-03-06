@@ -2,6 +2,7 @@
 
 import sys
 import os
+import pathlib
 import time
 
 from . import tools
@@ -25,27 +26,43 @@ class Run_Context():
     #---------------------------------------------------------------------------
     def __init__(
         self,
-        log_dir,
-        resource_dir,
-        platform,
-        system_image,
-        sd_card_size,
-        printer           = None,
-        print_log         = False,
+        request,
         boot_mode         = BootMode.BARE_METAL,
-        proxy_config      = None,
-        additional_params = None):
+        use_proxy         = False,
+        sd_card_size      = None,
+        additional_params = None
+    ):
 
-        self.log_dir           = log_dir
-        self.resource_dir      = resource_dir
-        self.platform          = platform
-        self.system_image      = system_image
-        self.sd_card_size      = sd_card_size
-        self.printer           = printer
-        self.print_log         = print_log
-        self.boot_mode         = boot_mode
-        self.proxy_config      = proxy_config
+        self.request = request
+        opts = request.config.option
+
+        self.boot_mode = boot_mode
+
+        # ToDo: This is another hack to pass more parameters. Clarify what this
+        #       is used for and consider adding dedicated field then.
         self.additional_params = additional_params
+
+        self.printer = tools.PrintSerializer()
+        self.print_log = opts.print_logs
+
+        log_dir = pathlib.Path(request.node.name).stem
+        if (opts.log_dir is not None):
+            log_dir = os.path.join(opts.log_dir, log_dir)
+        self.log_dir = log_dir
+
+        self.resource_dir      = opts.resource_dir
+        self.platform          = opts.target
+        self.system_image      = opts.system_image
+
+        self.sd_card_size      = sd_card_size if sd_card_size is not None \
+                                 else int(opts.sd_card) if opts.sd_card \
+                                 else 0
+
+        if use_proxy and not opts.proxy:
+            raise Exception('ERROR: missing proxy config')
+        self.use_proxy         = use_proxy
+        self.proxy_binary      = opts.proxy if use_proxy else None
+
 
 
 #===============================================================================
