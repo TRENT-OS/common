@@ -7,6 +7,7 @@ import time
 
 from . import tools
 from . import process_tools
+from . import wrapper_proxy
 from enum import Enum
 
 #===============================================================================
@@ -80,9 +81,17 @@ class System_Runner():
             raise Exception(f'ERROR: missing system image: {run_context.system_image}')
 
         self.run_context  = run_context
-        self.board_runner = None
 
         process_tools.install_abort_handler(self.cleanup)
+
+        self.board_runner = None
+
+        # Create the proxy wrapper only of we are going to use the Proxy.
+        self.proxy = None if not self.run_context.use_proxy \
+                     else wrapper_proxy.Proxy(
+                            binary  = self.run_context.proxy_binary,
+                            printer = run_context.printer,
+                          )
 
         self.system_log_file = None
 
@@ -90,6 +99,7 @@ class System_Runner():
         if sys_log_file_fqn:
             self.system_log_file = tools.Log_File(sys_log_file_fqn)
             self.print(f'  test system log: {self.system_log_file.name}')
+
 
 
     #---------------------------------------------------------------------------
@@ -113,11 +123,33 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
+    def is_proxy_running(self):
+        return (self.proxy is not None) and self.proxy.is_running()
+
+
+    #---------------------------------------------------------------------------
+    # This is a callback that the actual board_runner can use in its start() to
+    # start the proxy with a specific configuration. As a convenience, it may
+    # call this unconditionally, we just do nothing if the proxy usage was not
+    # enabled explicitly.
+    def startProxy(self, connection, enable_tap, print_log = False):
+        if self.proxy:
+            assert not self.is_proxy_running()
+            self.proxy.start(
+                log_dir = self.run_context.log_dir,
+                connection = connection,
+                enable_tap = enable_tap,
+                print_log  = print_log,
+            )
+
+
+    #---------------------------------------------------------------------------
     def start(self):
 
         if self.board_runner is None:
             raise Exception('no board specific runner set')
 
+        # This may call startProxy()
         self.board_runner.start()
 
         if self.run_context.boot_mode == BootMode.BARE_METAL:
@@ -163,6 +195,10 @@ class System_Runner():
 
     #---------------------------------------------------------------------------
     def stop(self):
+
+        if self.proxy:
+            self.proxy.stop()
+
         err = None
         if self.board_runner is not None:
             try:

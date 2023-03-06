@@ -128,6 +128,13 @@ class BoardRunner():
         self.board.power_off()
         time.sleep(0.1)
 
+        # This starts the proxy only if it was explicitly enabled, otherwise it
+        # does nothing.
+        #self.generic_runner.startProxy(
+        #    connection = f'UART:{self.self.board_setup.uart1.device}',
+        #    enable_tap = True,
+        #)
+
         # setup the SD card
         mp = self.board_setup.sd_wire.switch_to_host_and_mount(timeout_sec = 5)
 

@@ -898,7 +898,6 @@ class QemuProxyRunner():
         self.bridge = TcpBridge(printer=self.get_printer())
 
         self.process_qemu = None
-        self.process_proxy = None
 
         QemuProxyRunner.port_cnt_lock.acquire()
         base_port = QemuProxyRunner.qemu_uart_network_port
@@ -930,11 +929,6 @@ class QemuProxyRunner():
     #---------------------------------------------------------------------------
     def is_qemu_running(self):
         return self.process_qemu and self.process_qemu.is_running()
-
-
-    #---------------------------------------------------------------------------
-    def is_proxy_running(self):
-        return self.process_proxy and self.process_proxy.is_running()
 
 
     #---------------------------------------------------------------------------
@@ -1123,44 +1117,6 @@ class QemuProxyRunner():
                 5)
 
 
-    #---------------------------------------------------------------------------
-    def start_proxy(self):
-
-        # QEMU must be running, but not Proxy and the proxy params must exist
-        assert self.is_qemu_running()
-        assert not self.is_proxy_running()
-        proxy_app = self.run_context.proxy_binary
-        assert proxy_app is not None
-        assert isinstance(proxy_app, str)
-        if not os.path.isfile(proxy_app):
-            raise Exception(f'ERROR: missing proxy binary: {proxy_app}')
-
-        # start the bridge between QEMU and the Proxy
-        self.bridge.start_server(self.proxy_network_port)
-
-        # start the proxy and have it connect to the bridge
-        cmd_arr = [
-            proxy_app,
-            '-c', f'TCP:{self.proxy_network_port}',
-            '-t', '1' # enable TAP
-        ]
-
-        self.process_proxy = process_tools.ProcessWrapper(
-                                cmd_arr,
-                                log_file_stdout = self.generic_runner.get_log_file_fqn('proxy_out.txt'),
-                                log_file_stderr = self.generic_runner.get_log_file_fqn('proxy_err.txt'),
-                                printer = self.get_printer(),
-                                name = 'Proxy'
-                             )
-
-        self.print(f'starting Proxy: {" ".join(cmd_arr)}')
-        self.print(f'  proxy stdout: {self.process_proxy.log_file_stdout}')
-        self.print(f'  proxy stderr: {self.process_proxy.log_file_stderr}')
-
-        # Start Proxy, but don't print the proxy logs to the console.
-        self.process_proxy.start()
-
-
     #----------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def start(self):
@@ -1176,7 +1132,13 @@ class QemuProxyRunner():
         # non-responsiveness must be taken into account anywhere.
 
         if self.run_context.use_proxy:
-            self.start_proxy()
+            # Start the bridge between QEMU and the Proxy.
+            self.bridge.start_server(self.proxy_network_port)
+            # Start the proxy
+            self.generic_runner.startProxy(
+                connection = f'TCP:{self.proxy_network_port}',
+                enable_tap = True,
+            )
 
 
     #---------------------------------------------------------------------------
@@ -1188,10 +1150,6 @@ class QemuProxyRunner():
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def cleanup(self):
-        if self.is_proxy_running():
-            #self.print('terminating Proxy...')
-            self.process_proxy.terminate()
-            self.process_proxy = None
 
         if self.is_qemu_running():
             #self.print('terminating QEMU...')
@@ -1204,7 +1162,7 @@ class QemuProxyRunner():
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def get_serial_socket(self):
-        return None if self.is_proxy_running() \
+        return None if self.generic_runner.is_proxy_running() \
                else self.bridge.get_source_socket()
 
 
