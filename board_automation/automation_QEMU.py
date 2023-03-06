@@ -1165,7 +1165,8 @@ class QemuProxyRunner():
         self.print(f'  proxy stdout: {self.process_proxy.log_file_stdout}')
         self.print(f'  proxy stderr: {self.process_proxy.log_file_stderr}')
 
-        self.process_proxy.start(print_log = self.run_context.print_log)
+        # Start Proxy, but don't print the proxy logs to the console.
+        self.process_proxy.start()
 
 
     #----------------------------------------------------------------------------
