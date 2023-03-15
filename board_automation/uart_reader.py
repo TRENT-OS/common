@@ -220,6 +220,31 @@ class UART_Reader():
 
 
     #---------------------------------------------------------------------------
+    def start_monitor(self, log_file, print_log):
+        assert self.port is not None
+        assert self.monitor_thread is None
+        self.monitor_thread = threading.Thread(
+            target = self.monitor_channel,
+            args = (log_file, print_log)
+        )
+        self.stop_thread = False
+        self.monitor_thread.start()
+
+
+    #---------------------------------------------------------------------------
+    def stop_monitor(self):
+        if self.monitor_thread is not None:
+            self.stop_thread = True
+            self.monitor_thread.join()
+            self.monitor_thread = None
+
+
+    #---------------------------------------------------------------------------
+    def is_monitor_running(self):
+        return self.monitor_thread is not None
+
+
+    #---------------------------------------------------------------------------
     def start(self, log_file = None, print_log = False):
 
         # port must not be open
@@ -243,22 +268,13 @@ class UART_Reader():
                                   #inter_byte_timeout=None,
                                   #exclusive=None
                                   )
-
-        self.monitor_thread = threading.Thread(
-            target = self.monitor_channel,
-            args = (log_file, print_log)
-        )
-
-        self.monitor_thread.start()
+        if log_file or print_log:
+            self.start_monitor(log_file, print_log)
 
 
     #---------------------------------------------------------------------------
     def stop(self):
-
-        if self.monitor_thread is not None:
-            self.stop_thread = True
-            self.monitor_thread.join()
-            self.monitor_thread = None
+        self.stop_monitor()
 
         if self.port is not None:
             self.port.close()
