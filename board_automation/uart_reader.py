@@ -223,7 +223,7 @@ class UART_Reader():
     def start(self, log_file = None, print_log = False):
 
         # port must not be open
-        assert(self.port is None)
+        assert self.port is None
 
         # When the port is not 'None', it is immediately opened on object
         # creation, no call to open() is necessary.
