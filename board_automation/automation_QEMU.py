@@ -995,7 +995,11 @@ class QemuProxyRunner():
         #qemu.add_params('-d', 'in_asm,exec,nochain') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
-        if self.run_context.platform in ['hifive', 'migv_qemu']:
+        if self.run_context.platform in ['hifive',
+                                         'migv_qemu',
+                                         'qemu-riscv-virt64',
+                                         'qemu-riscv-virt32',
+                                        ]:
             qemu.config['bios'] = self.run_context.system_image
         else:
             # Seems older QEMU versions do not support the 'bios' parameter, so
@@ -1045,12 +1049,10 @@ class QemuProxyRunner():
             # the proxy)
             qemu.add_dev_nic_tap('tap2')
 
-        elif qemu.get_machine() == 'virt':
+        elif (qemu.get_machine() == 'virt') and qemu.config['cpu'].startswith('cortex-a'):
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
-            # ToDo: check virt platform of other architectures
-            assert qemu.config['cpu'].startswith('cortex-a')
             qemu.add_dev_nic_none()
 
         # Platform setup (SD Card ...)
