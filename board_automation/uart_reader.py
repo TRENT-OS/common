@@ -180,6 +180,8 @@ class UART_Reader():
                 # readline() encountered a timeout
                 continue
 
+            delta = datetime.datetime.now() - start;
+
             # We support raw plain single byte ASCII chars only, because they
             # can always be decoded as all 256 bit combinations are valid. For
             # the standard string UTF-8 encoding with multi-byte chars, certain
@@ -191,8 +193,6 @@ class UART_Reader():
             # cursor move backwards on the screen. Could also print
             # something like '<BACKSPACE>' instead
             line_str = line_str.replace('\b', '')
-
-            delta = datetime.datetime.now() - start;
 
             if f_log is not None:
                 f_log.write(f'[{delta}] {line_str}{os.linesep}')
