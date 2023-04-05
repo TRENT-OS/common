@@ -187,12 +187,10 @@ class UART_Reader():
             # the standard string UTF-8 encoding with multi-byte chars, certain
             # bit pattern (e.g. from line garbage or transmission errors) would
             # raise decoding errors because they are not valid.
-            line_str = line.strip().decode('latin_1')
-
-            # remove backspace chars, as we don't want to have the
-            # cursor move backwards on the screen. Could also print
-            # something like '<BACKSPACE>' instead
-            line_str = line_str.replace('\b', '')
+            # Remove any trailing '\r' or '\n'. Remove backspace chars, as we
+            # don't want to have the cursor move backwards on the screen. Could
+            # also print something like '<BACKSPACE>' instead
+            line_str = line.decode('latin_1').rstrip('\r\n').replace('\b', '')
 
             if f_log is not None:
                 f_log.write(f'[{delta}] {line_str}{os.linesep}')
