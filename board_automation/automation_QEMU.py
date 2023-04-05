@@ -750,10 +750,18 @@ def get_qemu(target, printer=None):
             #],
         },
         'spike64': {
-            'qemu-bin': 'qemu-system-riscv64',
+            'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-riscv64',
             'machine':  'spike',
             'cpu':      'rv64',
+            'cores': 1,
             'memory':   4095,
+            'raw_params': [
+                #'-singlestep',
+                '--accel', 'tcg,thread=single',
+                #'-trace', 'events=/ramdisk/events',
+                #'-d', 'cpu_reset,int,in_asm,exec,nochain,unimp,guest_errors',
+                #'-D', '/ramdisk/qemu_log.txt',
+            ]
         },
         'spike32': {
             'qemu-bin': 'qemu-system-riscv32',
