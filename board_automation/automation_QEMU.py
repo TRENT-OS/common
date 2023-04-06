@@ -784,7 +784,7 @@ def get_qemu(target, printer=None):
             'memory':   2048,
         },
         'qemu-arm-virt-a53': {
-            'qemu-bin':   'qemu-system-aarch64',
+            'qemu-bin':   '/host/build/qemu-system-aarch64',
             'machine':    ['virt', {
                 'secure':         'off',
                 'virtualization': 'on',
