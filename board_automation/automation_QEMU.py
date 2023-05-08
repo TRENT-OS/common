@@ -714,7 +714,9 @@ def get_qemu(target, printer=None):
 
     qemu_cfgs = {
         'sabre': {
-            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'qemu-bin': '/host/qemu/build/qemu-system-arm',
+            # 'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            # 'qemu-bin': '/opt/hc/qemu-6.2.0/qemu-system-arm',
             'machine':  'sabrelite',
             'memory':   1024,
             'syslog-uart': 1, # kernel log is on UART1, not UART0
@@ -725,7 +727,7 @@ def get_qemu(target, printer=None):
             'memory':   1024,
         },
         'hifive': {
-            'qemu-bin': 'qemu-system-riscv64',
+            'qemu-bin': '/host/qemu/build/qemu-system-riscv64',
             'machine':  'sifive_u',
             'memory':   8192,
             # Core setting works as:
@@ -750,7 +752,8 @@ def get_qemu(target, printer=None):
             #],
         },
         'spike64': {
-            'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-riscv64',
+            'qemu-bin': '/host/qemu/build/qemu-system-riscv64',
+            # 'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-riscv64',
             'machine':  'spike',
             'cpu':      'rv64',
             'cores': 1,
@@ -764,19 +767,21 @@ def get_qemu(target, printer=None):
             ]
         },
         'spike32': {
-            'qemu-bin': 'qemu-system-riscv32',
+            'qemu-bin': '/host/qemu/build/qemu-system-riscv32',
             'machine':  'spike',
             'cpu':      'rv32',
             'memory':   1024,
         },
         'zynq7000': {
-            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'qemu-bin': '/host/qemu/build/qemu-system-arm',
+            # 'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-arm',
             'machine':  'xilinx-zynq-a9',
             'memory':   1024,
             'syslog-uart': 1, # kernel log is on UART1, not UART0
         },
         'zynqmp': {
-            'qemu-bin': 'qemu-system-aarch64',
+            'qemu-bin': '/host/qemu/build/qemu-system-aarch64',
+            # 'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-aarch64',
             'machine':  ['xlnx-zcu102', {
                 'secure':         'off',
                 'virtualization': 'on',
@@ -788,7 +793,7 @@ def get_qemu(target, printer=None):
             'memory':   4096,
         },
         'qemu-arm-virt-a15': {
-            'qemu-bin': '/opt/hc/bin/qemu-system-arm',
+            'qemu-bin': '/host/qemu/build/qemu-system-arm',
             'machine':  ['virt', {
                 'secure':         'off',
                 'virtualization': 'on',
@@ -799,7 +804,7 @@ def get_qemu(target, printer=None):
             'memory':   2048,
         },
         'qemu-arm-virt-a53': {
-            'qemu-bin':   'qemu-system-aarch64',
+            'qemu-bin': '/host/qemu/build/qemu-system-aarch64',
             'machine':    ['virt', {
                 'secure':         'off',
                 'virtualization': 'on',
@@ -810,26 +815,26 @@ def get_qemu(target, printer=None):
             'memory':   3072,
         },
         'qemu-arm-virt-a57': {
-            'qemu-bin': 'qemu-system-aarch64',
+            'qemu-bin': '/host/qemu/build/qemu-system-aarch64',
             'machine':  'virt',
             'cpu':      'cortex-a57',
             'memory':   2048,
         },
         'qemu-arm-virt-a72': {
-            'qemu-bin': 'qemu-system-aarch64',
+            'qemu-bin': '/host/qemu/build/qemu-system-aarch64',
             'machine':  'virt',
             'cpu':      'cortex-a72',
             'memory':   2048,
         },
         'qemu-riscv-virt32': {
-            'qemu-bin': 'qemu-system-riscv32',
+            'qemu-bin': '/host/qemu/build/qemu-system-riscv32',
             'machine':  'virt',
             'cpu':      'rv32', # virt uses rv32gc
             'memory':   3072,
             'cores':    1, # virt supports up to 8 harts
         },
         'qemu-riscv-virt64': {
-            'qemu-bin': 'qemu-system-riscv64',
+            'qemu-bin': '/host/qemu/build/qemu-system-riscv64',
             'machine':  'virt',
             'cpu':      'rv64', # virt uses rv64gc
             'memory':   3072,
@@ -1013,6 +1018,7 @@ class QemuProxyRunner():
                             'zynqmp',
                             'zynqmp-qemu-xilinx',
                             'hifive',
+                            'qemu-riscv-virt64',
                         ])
         assert 0 == len(qemu.config['serial_ports'])
         if not has_syslog_on_uart_1:
