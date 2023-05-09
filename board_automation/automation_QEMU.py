@@ -466,13 +466,21 @@ class QEMU_AppWrapper:
         self,
         printer = None):
 
+        def check_param(cfg, name, alias=None, transform_fn=None):
+            param = cfg.pop(name, None)
+            return [] if not param else [
+                f'-{alias if alias else name}',
+                transform_fn(param) if transform_fn else param
+            ]
+
+        cmd_arr = []
         cfg = self.config.copy()
 
         param = cfg.pop('qemu-bin', None)
         if param is None:
             printer.print('no binary given for QEMU')
             return None
-        cmd_arr = [ param ]
+        cmd_arr += [ param ]
 
         param = cfg.pop('machine', None)
         if param is None:
@@ -484,37 +492,21 @@ class QEMU_AppWrapper:
             param = param[0] + ',' + self.serialize_param_dict(param[1])
         cmd_arr += ['-machine', param]
 
-        param = cfg.pop('dtb', None)
-        if param:
-            cmd_arr += ['-dtb', param]
+        # passing a DTB with the hardware details is a nice feature, but it's
+        # supported by the Xilinx-QEMU fork only.
+        cmd_arr += check_param(cfg, 'dtb');
 
-        param = cfg.pop('cpu', None)
-        if param:
-            cmd_arr += ['-cpu', param]
-
-        param = cfg.pop('cores', None)
-        if param:
-            cmd_arr += ['-smp', str(param)]
-
-        param = cfg.pop('memory', None)
-        if param:
-            cmd_arr += ['-m', f'size={param}M']
+        cmd_arr += check_param(cfg, 'cpu');
+        cmd_arr += check_param(cfg, 'cores', 'smp', lambda p: str(p));
+        cmd_arr += check_param(cfg, 'memory', 'm', lambda p: f'size={p}M');
 
         param = cfg.pop('graphic', False)
         if not param: # works also if set to None
             cmd_arr += ['-nographic']
 
-        param = cfg.pop('singlestep', False)
-        if param: # works also is set to None
-            cmd_arr += ['-singlestep']
-
-        param = cfg.pop('kernel', None)
-        if param:
-            cmd_arr += ['-kernel', param]
-
-        param = cfg.pop('bios', None)
-        if param:
-            cmd_arr += ['-bios', param]
+        cmd_arr += check_param(cfg, 'singlestep');
+        cmd_arr += check_param(cfg, 'kernel');
+        cmd_arr += check_param(cfg, 'bios');
 
         # SD-Card images are basically a device/drive combination
         param = cfg.pop('sdcard_images', [])
