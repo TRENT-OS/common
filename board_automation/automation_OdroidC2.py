@@ -4,6 +4,7 @@ import os
 import time
 import pathlib
 
+from . import relay_control
 from . import sd_wire
 from . import uart_reader
 from . import wrapper_pyftdi
@@ -28,9 +29,20 @@ class BoardSetup():
         self.tftp_ip = '10.0.0.21'
         self.tftp_server_ip = '10.0.0.10'
 
-        # ToDo:
-        # - relay control for power on/off (self.gpio = ...)
-        # - SD card control via SD-Wire (self.sd_wire = ...)
+        # self.gpio = wrapper_pyftdi.get_pyftdi_gpio('ftdi://ftdi:232h:1/1')
+        # relay_board = relay_control.Relay_Board(self.gpio)
+        #
+        # self.relay_config = relay_control.Relay_Config({
+        #                         'POWER':  relay_board.get_relay(0),
+        #                         'notRUN': relay_board.get_relay(1),
+        #                         'notPEN': relay_control.Relay_Dummy()
+        #                      })
+        #
+        #
+        # self.sd_wire = sd_wire.SD_Wire(
+        #             serial     = 'sdw-7',
+        #             usb_path   = '1-4.2.1.1.3',
+        #             mountpoint = '/media')
 
         # UART0 is for syslog
         uart = uart_reader.TTY_USB.find_device(

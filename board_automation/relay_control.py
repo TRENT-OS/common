@@ -34,13 +34,14 @@ class Relay_Base(abc.ABC):
         pass
 
     #---------------------------------------------------------------------------
-    @abc.abstractmethod
     def set_on(self):
-        pass
+        self.prepare_state_on()
+        self.apply_state()
 
     #---------------------------------------------------------------------------
-    @abc.abstractmethod
     def set_off(self):
+        self.prepare_state_off()
+        self.apply_state()
         pass
 
 
@@ -52,41 +53,26 @@ class Relay_Dummy(Relay_Base):
     A dummy relay that does nothing. Useful as placeholder until there is a
     real relay
     """
-    pass
 
     #---------------------------------------------------------------------------
-    def __init__(self):
-        pass
-
+    def __init__(self, relay_mgr=None, relay_id=None):
+        self.relay_mgr = relay_mgr
+        self.relay_id = relay_id
 
     #---------------------------------------------------------------------------
     def get_manager(self):
-        print('{}() not implemented'.format(inspect.stack()[1][3]))
-        return None
-
+        return self.relay_mgr
 
     #---------------------------------------------------------------------------
     def prepare_state_on(self):
         print('{}() not implemented'.format(inspect.stack()[1][3]))
 
-
     #---------------------------------------------------------------------------
     def prepare_state_off(self):
         print('{}() not implemented'.format(inspect.stack()[1][3]))
 
-
     #---------------------------------------------------------------------------
     def apply_state(self):
-        print('{}() not implemented'.format(inspect.stack()[1][3]))
-
-
-    #---------------------------------------------------------------------------
-    def set_on(self):
-        print('{}() not implemented'.format(inspect.stack()[1][3]))
-
-
-    #---------------------------------------------------------------------------
-    def set_off(self):
         print('{}() not implemented'.format(inspect.stack()[1][3]))
 
 
@@ -116,31 +102,32 @@ class Relay(Relay_Base):
     #---------------------------------------------------------------------------
     # prepare the relay state on, but do not actually switch the relay on
     def prepare_state_on(self):
-        self.relay_mgr.prepare_state_on(self.relay_id)
+        mgr = self.get_manager()
+        if mgr: mgr.prepare_state_on(self.relay_id)
 
 
     #---------------------------------------------------------------------------
     # prepare the relay state off, but do not actually switch the relay off
     def prepare_state_off(self):
-        self.relay_mgr.prepare_state_off(self.relay_id)
+        self.get_manager().prepare_state_off(self.relay_id)
 
 
     #---------------------------------------------------------------------------
     # apply the prepared relay states
     def apply_state(self):
-        self.relay_mgr.apply_state()
+        self.get_manager().apply_state()
 
 
     #---------------------------------------------------------------------------
     # switch the relay on
     def set_on(self):
-        self.relay_mgr.set_on(self.relay_id)
+        self.get_manager().set_on(self.relay_id)
 
 
     #---------------------------------------------------------------------------
     # switch the relay off
     def set_off(self):
-        self.relay_mgr.set_off(self.relay_id)
+        self.get_manager().set_off(self.relay_id)
 
 
 #===============================================================================
