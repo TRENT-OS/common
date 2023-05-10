@@ -192,12 +192,17 @@ class UART_Reader():
             # also print something like '<BACKSPACE>' instead
             line_str = line.decode('latin_1').rstrip('\r\n').replace('\b', '')
 
-            if f_log is not None:
-                f_log.write(f'[{delta}] {line_str}{os.linesep}')
-                f_log.flush() # ensure things are really written
+            # ToDO: Unfortunately, printing to screen first and then to file
+            #       still does not guarantee more the log is shown, so we have
+            #       to keep the delays before flushing when the test end, either
+            #       due to an error or in case of success
 
             if print_log:
                 self.print(f'[{delta} {self.name}] {line_str}')
+
+            if f_log is not None:
+                f_log.write(f'[{delta}] {line_str}{os.linesep}')
+                f_log.flush() # ensure things are really written
 
 
     #---------------------------------------------------------------------------
