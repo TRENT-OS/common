@@ -51,6 +51,13 @@ class BoardSetup():
                      )
         self.uarts.append(uart)
 
+        # UART1 is for data
+        uart = uart_reader.TTY_USB.find_device(
+                        #serial    = '...',
+                        usb_path  = '1-4.2.1.1.3'
+                     )
+        self.uarts.append(uart)
+
 
     #---------------------------------------------------------------------------
     def cleanup(self):
@@ -73,13 +80,22 @@ class BoardAutomation():
         self.monitors = []
 
         # create monitor for syslog
-        uart_syslog = self.get_uart_syslog()
-        assert uart_syslog
-        monitor = uart_reader.UART_Reader(
-                    device  = uart_syslog.device,
-                    name    = 'UART0',
-                    printer = generic_runner.run_context.printer)
-        self.monitors.append(monitor)
+        self.monitors.append(
+            uart_reader.UART_Reader(
+                device  = self.get_uart_syslog().device,
+                name    = 'UART0',
+                printer = generic_runner.run_context.printer
+            )
+        )
+
+        # test monitor for data UART
+        self.monitors.append(
+            uart_reader.UART_Reader(
+                device  = self.get_uart_data().device,
+                name    = 'UART1',
+                printer = generic_runner.run_context.printer,
+            )
+        )
 
 
     #---------------------------------------------------------------------------
@@ -107,6 +123,8 @@ class BoardAutomation():
 
     #---------------------------------------------------------------------------
     def get_uart_syslog(self):
+        if not self.board_setup:
+            raise Exception('missing board setup')
         uarts = self.board_setup.uarts
         if (len(uarts) < 1):
             raise Exception('no uart with syslog')
@@ -115,6 +133,8 @@ class BoardAutomation():
 
     #---------------------------------------------------------------------------
     def get_uart_data(self):
+        if not self.board_setup:
+            raise Exception('missing board setup')
         uarts = self.board_setup.uarts
         if (len(uarts) < 2):
             raise Exception('no uart for data')
@@ -126,6 +146,13 @@ class BoardAutomation():
         if (len(self.monitors) < 1):
             raise Exception('no syslog monitor')
         return self.monitors[0]
+
+
+    #---------------------------------------------------------------------------
+    def get_uart_data_monitor(self):
+        if (len(self.monitors) < 2):
+            raise Exception('no syslog monitor')
+        return self.monitors[1]
 
 
     #---------------------------------------------------------------------------
@@ -199,6 +226,13 @@ class BoardRunner():
             )
 
         self.board.start_system_log()
+
+        # Activate monitor for data uart to get additional boot logs
+        self.board.get_uart_data_monitor().start(
+            log_file = self.generic_runner.system_log_file.name,
+            print_log = self.generic_runner.run_context.print_log,
+        )
+
         log = self.generic_runner.get_system_log_line_reader()
         assert log # if there was no exception, this must exist
 
