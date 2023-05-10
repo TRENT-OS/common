@@ -60,6 +60,7 @@ class BoardAutomation():
         self.board_setup = board_setup
         self.monitors = []
 
+        # create monitor for syslog
         uart_syslog = self.get_uart_syslog()
         assert uart_syslog
         monitor = uart_reader.UART_Reader(
@@ -293,14 +294,6 @@ class BoardRunner():
         uboot.cmd_bootelf(elf_load_addr)
         time.sleep(0.1)
         log.flush()
-
-        # There is a monitor on UART1, stop it to use the UART for data.
-        # self.print('stop monitor for UART1')
-        # uart1_monitor = self.board.monitors[1]
-        # uart1_monitor.stop_monitor()
-        # assert not uart1_monitor.is_monitor_running()
-        # self.data_uart = SerialWrapper(uart1_monitor.port)
-        # self.print('plat start done')
 
 
     #---------------------------------------------------------------------------
