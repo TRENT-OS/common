@@ -133,20 +133,6 @@ class BoardAutomation():
 
 
     #---------------------------------------------------------------------------
-    def get_uboot_automation(self, log = None):
-        if log is None:
-            log = self.generic_runner.get_system_log_line_reader()
-        monitor = self.get_system_log_monitor()
-        assert monitor
-        # It may look a bit odd to write to a monitor, but that is a hack to
-        # make things work for now. The monitor has an I/O channel inside, but
-        # we need to refactor things to get access to that I/O channel. It would
-        # be best if we created the I/O channel and then give it to the monitor
-        # and who else needs it, like we do it with the system log stream.
-        return wrapper_uboot.UBootAutomation(log, monitor.port.write)
-
-
-    #---------------------------------------------------------------------------
     def power_on(self):
         self.print('no automation, power on manually')
 
@@ -200,7 +186,18 @@ class BoardRunner():
 
         self.board.start_system_log()
         log = self.generic_runner.get_system_log_line_reader()
-        uboot = self.board.get_uboot_automation(log)
+        assert log # if there was no exception, this must exist
+
+        # The UBoot wrapper needs a way to access the log and a function to send
+        # commands. The syslog monitor has an UART's I/O channel inside, so this
+        # is where we get the write function from. It's a bit hacky, we should
+        # refactor things that we first obtain an I/O channel, and then give
+        # this to the monitor and who else needs it.
+        monitor = self.board.get_system_log_monitor()
+        assert monitor # if there was no exception, this must exist
+        uboot = wrapper_uboot.UBootAutomation(log, monitor.port.write)
+        assert uboot # if there was no exception, this must exist
+
         self.board.power_on()
 
         ret = log.find_matches_in_lines([
