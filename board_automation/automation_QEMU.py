@@ -501,7 +501,7 @@ class QEMU_AppWrapper:
             cmd_arr += ['-m', f'size={param}M']
 
         param = cfg.pop('graphic', False)
-        if not param: # works also is set to None
+        if not param: # works also if set to None
             cmd_arr += ['-nographic']
 
         param = cfg.pop('singlestep', False)
