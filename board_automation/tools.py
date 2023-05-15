@@ -136,6 +136,12 @@ def find_usb_by_serial(serial):
 
 
 #-------------------------------------------------------------------------------
+# The 'sd_content_list' elements can be
+# - a string HOST_OS_FILE with the file path, where the file it put in
+#   the root folder of the card then
+# - a 2-tupel (HOST_OS_FILE, SD_FILE), where SD_FILE can be
+#   - a file name including path where the file is to be placed
+#   - a path name (if it is ends with '/'), where the file is to be placed
 def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
     # Create SD image file
     #   - Create a binary file and truncate to the received size.
@@ -145,17 +151,30 @@ def create_sd_img(sd_img_path, sd_img_size, sd_content_list = []):
     # Format SD to a FAT32 FS
     subprocess.check_call(['mkfs.fat', '-F', '32', sd_img_path])
 
-    # Copy items to SD image:
-    #   - sd_content_list is a list of tuples: (HOST_OS_FILE_PATH, SD_FILE_PATH).
-    #   - mcopy (part of the mtools package) copies the file from the linux host
-    #     to the SD card image without having to mount the SD card first.
+    # Copy items to SD image using mcopy (part of the mtools package). It copies
+    # the file from the linux host to the SD card image without having to mount
+    # the SD card first.
     for item in sd_content_list:
+
+        disk_file = None
+        card_file = None
+        if isinstance(item, str):
+            disk_file = item
+            card_file = os.path.basename(item)
+        elif type(item) is tuple:
+            disk_file = item[0]
+            card_file = item[1]
+            if card_file.endswith('/'):
+                card_file += os.path.basename(disk_file)
+        else:
+            raise Exception(f'invalid item: {item}')
+
         subprocess.check_call([
             'mcopy',
             '-i',
             sd_img_path,
-            item[0],
-            os.path.join('::/', item[1])])
+            disk_file,
+            os.path.join('::/', card_file)])
 
 
 #===============================================================================
