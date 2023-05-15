@@ -10,7 +10,6 @@ from . import uart_reader
 from . import wrapper_pyftdi
 from . import wrapper_uboot
 
-
 #===============================================================================
 #===============================================================================
 
@@ -22,7 +21,6 @@ class BoardSetup():
         self.printer = printer
         self.gpio = None
         self.sd_wire = None
-        self.uarts = []
 
         self.MAC = '00:1e:06:37:8c:98'
 
@@ -44,19 +42,21 @@ class BoardSetup():
         #             usb_path   = '1-4.2.1.1.3',
         #             mountpoint = '/media')
 
-        # UART0 is for syslog
-        uart = uart_reader.TTY_USB.find_device(
-                        #serial    = '...',
-                        usb_path  = '1-4.2.1.1.2'
-                     )
-        self.uarts.append(uart)
-
-        # UART1 is for data
-        uart = uart_reader.TTY_USB.find_device(
-                        #serial    = '...',
-                        usb_path  = '1-4.2.1.1.3'
-                     )
-        self.uarts.append(uart)
+        self.uarts = {
+            # syslog is here
+            'UART_AO_A': uart_reader.TTY_USB.find_device(
+                #serial    = '...',
+                usb_path  = '1-4.2.1.1.2'
+            ),
+            'UART_A':  uart_reader.TTY_USB.find_device(
+                #serial    = '...',
+                usb_path  = '1-4.2.1.1.3'
+            ),
+            'UART_B': uart_reader.TTY_USB.find_device(
+                #serial    = '...',
+                usb_path  = '1-4.2.1.1.4'
+            )
+        }
 
 
     #---------------------------------------------------------------------------
@@ -79,23 +79,17 @@ class BoardAutomation():
         self.board_setup = board_setup
         self.monitors = []
 
-        # create monitor for syslog
-        self.monitors.append(
-            uart_reader.UART_Reader(
-                device  = self.get_uart_syslog().device,
-                name    = 'UART0',
-                printer = generic_runner.run_context.printer
+        # create monitor for syslog UART and other UARTS that my print something
+        for uart_name in ['UART_AO_A', 'UART_A', 'UART_B']:
+            uart = self.board_setup.uarts[uart_name]
+            assert uart # if there was no exception, this must exist
+            self.monitors.append(
+                uart_reader.UART_Reader(
+                    device  = uart.device,
+                    name    = uart_name,
+                    printer = generic_runner.run_context.printer
+                )
             )
-        )
-
-        # test monitor for data UART
-        self.monitors.append(
-            uart_reader.UART_Reader(
-                device  = self.get_uart_data().device,
-                name    = 'UART1',
-                printer = generic_runner.run_context.printer,
-            )
-        )
 
 
     #---------------------------------------------------------------------------
@@ -122,53 +116,53 @@ class BoardAutomation():
             printer.print(msg)
 
     #---------------------------------------------------------------------------
-    def get_uart_syslog(self):
+    #def get_uart(self, n):
+    #    if not self.board_setup:
+    #        raise Exception('missing board setup')
+    #    uarts = self.board_setup.uarts
+    #    if (len(uarts) <= n):
+    #        raise Exception(f'no uart #{n}')
+    #    return uarts[n]
+
+    #---------------------------------------------------------------------------
+    def get_monitor(self, n):
         if not self.board_setup:
             raise Exception('missing board setup')
-        uarts = self.board_setup.uarts
-        if (len(uarts) < 1):
-            raise Exception('no uart with syslog')
-        return uarts[0]
+        if (len(self.monitors) <= n):
+            raise Exception(f'no monito #{n}')
+        return self.monitors[n]
+
+
+    #---------------------------------------------------------------------------
+    def get_uart_syslog(self):
+        return self.get_uart(0)
 
 
     #---------------------------------------------------------------------------
     def get_uart_data(self):
-        if not self.board_setup:
-            raise Exception('missing board setup')
-        uarts = self.board_setup.uarts
-        if (len(uarts) < 2):
-            raise Exception('no uart for data')
-        return uarts[1]
+        return self.get_uart(1)
 
 
     #---------------------------------------------------------------------------
     def get_system_log_monitor(self):
-        if (len(self.monitors) < 1):
-            raise Exception('no syslog monitor')
-        return self.monitors[0]
+        return self.get_monitor(0)
 
 
     #---------------------------------------------------------------------------
     def get_uart_data_monitor(self):
-        if (len(self.monitors) < 2):
-            raise Exception('no syslog monitor')
-        return self.monitors[1]
+        return self.get_monitor(1)
 
 
     #---------------------------------------------------------------------------
     def start_system_log(self):
-        monitor = self.get_system_log_monitor()
-        assert monitor
-        monitor.start(
-            log_file = self.generic_runner.system_log_file.name,
-            print_log = self.generic_runner.run_context.print_log)
+        for m in self.monitors:
+            self.generic_runner.start_syslog_monitor(m)
 
 
     #---------------------------------------------------------------------------
     def stop_system_log(self):
-        monitor = self.get_system_log_monitor()
-        assert monitor
-        monitor.stop()
+        for m in self.monitors:
+            m.stop()
 
 
     #---------------------------------------------------------------------------
@@ -226,12 +220,6 @@ class BoardRunner():
             )
 
         self.board.start_system_log()
-
-        # Activate monitor for data uart to get additional boot logs
-        self.board.get_uart_data_monitor().start(
-            log_file = self.generic_runner.system_log_file.name,
-            print_log = self.generic_runner.run_context.print_log,
-        )
 
         log = self.generic_runner.get_system_log_line_reader()
         assert log # if there was no exception, this must exist
@@ -301,33 +289,73 @@ class BoardRunner():
         assert img.startswith('/host/')
         tftp_img = img.replace('/host/', 'seos_tests/', 1)
 
-        # ToDo: explain why we use this load address
-        #
-        # 0x8000'0000 +-----------------------------------+ DRAM end
-        #             | os_image.elf                      |
-        # 0x4000'0000 +-----------------------------------+
-        #             | boot.scr loaded by U-Boot         |
-        # 0x0800'0000 +-----------------------------------+
-        #             | (unused?)                         |
-        # 0x0140'00b0 +-----------------------------------+
-        #             | fip header                        |
-        # 0x0140'0000 +-----------------------------------+
-        #             | (unused?)                         |
-        # 0x1011'1130 +-----------------------------------+
-        #             | bl301                             |
-        # 0x1010'0000 +-----------------------------------+
-        #             | 1 MiByte scratch space, used for  |
-        #             | SD card loading                   |
-        #             |   bl30 (len 0x9ef0)               |
-        #             |   bl301 (len 0x18c0)              |
-        #             |   bl31/aka U-Boot (len 0x11130)   |
-        #             |   bl33 (len 0xa21d0)              |
-        # 0x0100'0000 +-----------------------------------+
-        #             | 16 MiByte unused                  |
-        # 0x0000'0000 +-----------------------------------+ DRAM start
-        #
-
+        # This seL4 image load address is basically a random choice that firs
+        # into the available memory space
         elf_load_addr = 0x40000000
+
+        # Memory usage during boot :
+        #
+        #   0x8000'0000 +-----------------------------------------+ DRAM end
+        #               | seL4 system_image                       |
+        #   0x4000'0000 +-----------------------------------------+
+        #               | free                                    |
+        #   0x1020'0000 +-----------------------------------------+
+        #               | 2 MiB reserved for TrustZone ("secmon") |
+        #   0x1000'0000 +-----------------------------------------+
+        #               | free                                    |
+        #               +-----------------------------------------+
+        #               | boot.scr loaded by U-Boot               |
+        #   0x0800'0000 +-----------------------------------------+
+        #               | free                                    |
+        #   0x0530'0000 +-----------------------------------------+
+        #               | 3 MiB reserved for TrustZone "(secmon") |
+        #   0x0500'0000 +-----------------------------------------+
+        #               | free                                    |
+        #   0x0140'00b0 +-----------------------------------------+
+        #               | fip header loaded from SD Card          |
+        #   0x0140'0000 +-----------------------------------------+
+        #               | 4 MiB scratch space, used for loading   |
+        #               | boot images from SD-Card                |
+        #               |   bl30 (len 0x9ef0)                     |
+        #               |   bl301 (len 0x18c0)                    |
+        #               |   bl31/aka U-Boot (len 0x11130)         |
+        #               |   bl33 (len 0xa21d0)                    |
+        #   0x0100'0000 +-----------------------------------------+
+        #               | 16 MiByte reserved ("hwrom")            |
+        #   0x0000'0000 +-----------------------------------------+ DRAM start
+        #
+        #
+        # The seL4 system_image is an ELF that contains the ElfLoader and the
+        # further images to load. The ElfLoader is built to run from a memory
+        # region that is well after the system images. Memory usage once the
+        # ElfLoader hands over
+        # control to seL4:
+        #
+        #   0x8000'0000 +-----------------------------------------+ DRAM end
+        #               | root task kernel objects                |
+        #               +-----------------------------------------+
+        #               | free                                    |
+        #   0x1020'0000 +-----------------------------------------+
+        #               | 2 MiB reserved for TrustZone ("secmon") |
+        #   0x1000'0000 +-----------------------------------------+
+        #               | free                                    |
+        #   0x0530'0000 +-----------------------------------------+
+        #               | 3 MiB reserved for TrustZone "(secmon") |
+        #   0x0500'0000 +-----------------------------------------+
+        #               | free                                    |
+        #   0x01c1'a000 +-----------------------------------------+
+        #               | ElfLoader was running here              |
+        #               +-----------------------------------------+
+        #               | free                                    |
+        #               +-----------------------------------------+
+        #               | seL4 root task                          |
+        #               +-----------------------------------------+
+        #               | DTB                                     |
+        #               +-----------------------------------------+
+        #               | seL4 kernel                             |
+        #   0x0100'0000 +-----------------------------------------+
+        #               | 16 MiByte reserved ("hwrom")            |
+        #   0x0000'0000 +-----------------------------------------+ DRAM start
 
         uboot.cmd_tftp(
             elf_load_addr,
@@ -340,6 +368,12 @@ class BoardRunner():
         time.sleep(0.1)
         log.flush()
 
+        # # There is a monitor on the data uart, stop it to use the UART for data.
+        # self.print('stop monitors for  for data UART1')
+        # monitor = self.board.get_monitor(1)
+        # assert monitor # if there was no exception, this must exist
+        # monitor.stop_monitor()
+        # assert not monitor.is_monitor_running()
 
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
@@ -364,9 +398,10 @@ class BoardRunner():
             raise Exception('ERROR: Proxy uses data UART')
 
         if self.data_uart_socket is None:
-            uart = self.board.get_uart_data()
-            assert uart # if there was no exception, this must exist
-            self.data_uart_socket = uart_reader.SerialSocketWrapper(uart.device)
+            #uart = self.board.get_uart_data()
+            #assert uart # if there was no exception, this must exist
+            #self.data_uart_socket = uart_reader.SerialSocketWrapper(uart.device)
+            self.data_uart_socket = uart_reader.DevNulSocketWrapper()
 
         return self.data_uart_socket
 

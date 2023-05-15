@@ -256,6 +256,13 @@ class System_Runner():
 
 
     #---------------------------------------------------------------------------
+    def start_syslog_monitor(self, monitor):
+        monitor.start(
+            log_file = self.system_log_file.name,
+            print_log = self.run_context.print_log)
+
+
+    #---------------------------------------------------------------------------
     def get_serial_socket(self):
         return self.board_runner.get_serial_socket()
 
