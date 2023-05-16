@@ -1032,7 +1032,10 @@ class QemuProxyRunner():
 
 
         # setup NICs
-        if platform == 'sabre':
+        if platform in [
+            'sabre', 
+            'zynq7000',
+        ]:
             # The Proxy uses tap1 to provide a network channel, so we use tap2
             # here for the native networking.
             qemu.add_nic_tap('tap2')
