@@ -297,6 +297,7 @@ class QEMU_AppWrapper:
             'drives': [],
             'devices': [],
             'serial_ports': [],
+            'raw_params': [],
             # non-QEMU related settings, e.g. for OS
             'syslog-uart': 0,
             # Defaults are set, add or overwrite custom config. Python support
@@ -310,15 +311,19 @@ class QEMU_AppWrapper:
         # SD card devices based on images need unique numbers.
         self.num_sdcard_images = 0
 
-        self.raw_params = []
+    #---------------------------------------------------------------------------
+    def setup(self, run_context):
+        pass # nothing special here
+
 
     #---------------------------------------------------------------------------
     def add_params(self, *argv):
+        raw_params = self.config['raw_params']
         for arg in argv:
             if isinstance(arg, list):
-                self.raw_params.extend(arg)
+                raw_params.extend(arg)
             else:
-                self.raw_params.append(arg)
+                raw_params.append(arg)
 
 
     #---------------------------------------------------------------------------
@@ -556,6 +561,9 @@ class QEMU_AppWrapper:
         for p in param:
             cmd_arr += ['-serial', p if p else 'null']
 
+        # add raw parameters
+        cmd_arr += cfg.pop('raw_params', [])
+
         # ToDo: Check if we still have to support this hack to pass additional
         #       parameters to QEMU to load some data into its memory. There
         #       should be a better way.
@@ -576,8 +584,6 @@ class QEMU_AppWrapper:
         if cfg:
             raise Exception(f'unsupported QEMU config items: {cfg}')
 
-        cmd_arr += self.raw_params
-
         if printer:
             printer.print(f'QEMU: {" ".join(cmd_arr)}')
 
@@ -595,9 +601,11 @@ class QEMU_AppWrapper:
 
 
 #-------------------------------------------------------------------------------
-class QEMU_zcu102(QEMU_AppWrapper):
+class QEMU_xilinx(QEMU_AppWrapper):
 
+    #---------------------------------------------------------------------------
     def __init__(self, param_dict = dict()):
+
         super().__init__(
             {
                 'qemu-bin': '/host/qemu/xilinx-v2022.1/qemu-system-aarch64',
@@ -613,12 +621,16 @@ class QEMU_zcu102(QEMU_AppWrapper):
 
 
     #---------------------------------------------------------------------------
-    # ToDo: generalize this hack and put a setup() in QEMU_AppWrapper
-    def setup(self, res_dir, log_dir):
+    def setup(self, run_context):
 
+        # ToDo: This is still a bit zcu102 specific, but that is the only
+        #       platform we use at the moment.
+
+        res_dir = os.path.join(run_context.resource_dir, 'zcu102_sd_card')
         if not os.path.isdir(res_dir):
             raise Exception(f'res_dir Directory {res_dir} does not exist!')
 
+        log_dir = run_context.log_dir
         if not os.path.isdir(log_dir):
             raise Exception(f'log_dir Directory {log_dir} does not exist!')
 
@@ -640,17 +652,6 @@ class QEMU_zcu102(QEMU_AppWrapper):
             raise Exception('The resource directory does not contain \
                              all necessary files to start QEMU')
 
-        # We don't pass a kernel to QEMU, because the zcu102 platform has
-        # "ROM code" that can boot U-Boot from an SD card. A special U-Boot
-        # version has been created that loads os_image.elf then.
-        sd_card_image = os.path.join(log_dir, 'sdcard1.img')
-        # ToDo: 128 MiB seems a lot if we just store os_image.elf there.
-        tools.create_sd_img(
-            sd_card_image,
-            128*1024*1024, # 128 MiB
-            [(self.run_context.system_image, 'os_image.elf')])
-        qemu.config['kernel'] = None
-        seld.add_sdcard_from_image(sd_card_image)
         self.config['dtb'] = pe_dtb
         self.add_params(
             '-global', 'xlnx,zynqmp-boot.cpu-num=0',
@@ -697,7 +698,7 @@ class QEMU_zcu102(QEMU_AppWrapper):
             print_log = print_log
         )
 
-        class Process_qemu_zcu102_microblaze():
+        class Process_qemu_zynqmp_microblaze():
             def __init__(self, processes):
                 self.processes = processes
             def is_running(self):
@@ -705,7 +706,7 @@ class QEMU_zcu102(QEMU_AppWrapper):
             def terminate(self):
                 for p in self.processes: p.terminate()
 
-        return Process_qemu_zcu102_microblaze([process_qemu_pe, process_qemu_pmu])
+        return Process_qemu_zynqmp_microblaze([process_qemu_pe, process_qemu_pmu])
 
 
 #-------------------------------------------------------------------------------
@@ -768,7 +769,7 @@ def get_qemu(target, printer=None):
             'memory':   4096,
         },
         'zynqmp-qemu-xilinx': {
-            'wrapper-class': QEMU_zcu102,
+            'wrapper-class': QEMU_xilinx,
             'memory':   4096,
         },
         'qemu-arm-virt-a15': {
@@ -964,9 +965,13 @@ class QemuProxyRunner():
         #qemu.add_params('-d', 'in_asm,exec,nochain') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
+        # specific setup
+        qemu.setup(self.run_context)
+
         platform = self.run_context.platform
         machine = qemu.get_machine()
 
+        # Set default images
         if platform in [
             'hifive',
             'migv_qemu',
@@ -991,6 +996,7 @@ class QemuProxyRunner():
                             'sabre',
                             'zynq7000',
                             'zynqmp',
+                            'zynqmp-qemu-xilinx',
                             'hifive',
                         ])
         assert 0 == len(qemu.config['serial_ports'])
@@ -1037,15 +1043,18 @@ class QemuProxyRunner():
 
 
         # setup SD Card
-        if isinstance(qemu, QEMU_zcu102):
-            # ZynqMP on the Xilinx-QEMU boots from a SD card, so the image must
-            # be set up. There are 2 QEMU instances actually, thus some more
-            # setup is needed.
-            qemu.setup(
-                os.path.join(
-                    self.run_context.resource_dir,
-                    'zcu102_sd_card'),
-                self.run_context.log_dir)
+        if isinstance(qemu, QEMU_xilinx):
+            # QEMU boots with ATF and and special U-Boot version, that loads
+            #  the system from the SD card's file os_image.elf.
+            qemu.config['kernel'] = None
+            log_dir = self.run_context.log_dir
+            sd_card_image = os.path.join(log_dir, 'sdcard1.img')
+            # ToDo: 128 MiB seems a lot if we just store os_image.elf there.
+            tools.create_sd_img(
+                sd_card_image,
+                128*1024*1024, # 128 MiB
+                [(self.run_context.system_image, 'os_image.elf')])
+            qemu.add_sdcard_from_image(sd_card_image)
 
         elif self.run_context.sd_card_size and (self.run_context.sd_card_size > 0):
             # If the test framework is invoked with an SD card image, but the

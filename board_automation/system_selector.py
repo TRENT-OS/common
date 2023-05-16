@@ -17,6 +17,7 @@ def get_test_runner(run_context):
         'spike': 'spike64',
         'qemu-arm-virt': 'qemu-arm-virt-a53',
         'qemu-riscv-virt': 'qemu-riscv-virt64'
+        # 'zynqmp': 'zynqmp-qemu-xilinx'
     }
     new_plat = translation_table.get(run_context.platform, None)
     if new_plat is not None:
@@ -27,6 +28,7 @@ def get_test_runner(run_context):
         automation_QEMU: [
             'sabre',
             'zynqmp',
+            'zynqmp-qemu-xilinx',
             'zynq7000',
             'spike32',
             'spike64',
