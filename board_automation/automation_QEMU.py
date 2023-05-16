@@ -527,7 +527,7 @@ class QEMU_AppWrapper:
         param = cfg.pop('devices', [])
         for (dev_type, sub_type, param_dict) in param:
             cmd_arr += [
-                '-' + dev_type,
+                f'-{dev_type}',
                 sub_type if param_dict is None \
                 else ','.join([
                     sub_type,
