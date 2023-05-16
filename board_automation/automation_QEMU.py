@@ -462,9 +462,7 @@ class QEMU_AppWrapper:
         return param
 
     #---------------------------------------------------------------------------
-    def get_qemu_start_cmd_params_array(
-        self,
-        printer = None):
+    def get_qemu_start_cmd_params_array(self):
 
         def check_param(cfg, name, alias=None, transform_fn=None):
             param = cfg.pop(name, None)
@@ -478,14 +476,12 @@ class QEMU_AppWrapper:
 
         param = cfg.pop('qemu-bin', None)
         if param is None:
-            printer.print('no binary given for QEMU')
-            return None
+            raise Exception(f'no QEMU binary set')
         cmd_arr += [ param ]
 
         param = cfg.pop('machine', None)
         if param is None:
-            printer.print('no machine given for QEMU')
-            return None
+            raise Exception('no QEMU machine set')
         if isinstance(param, list):
             assert isinstance(param[0], str)
             assert isinstance(param[1], dict) # may have 'dumpdtb=<filename>'
@@ -545,9 +541,7 @@ class QEMU_AppWrapper:
         assert param in [0, 1]
 
         if cfg:
-            if printer:
-                printer.print(f'QEMU: unsupported config: {cfg}')
-            return None
+            raise Exception(f'unsupported QEMU config items: {cfg}')
 
         return cmd_arr + self.raw_params
 
@@ -568,14 +562,10 @@ class QEMU_AppWrapper:
                 elif param[2] == self.Additional_Param_Type.BINARY_IMG:
                     self.load_blob(param[0], param[1])
                 else:
-                    printer.print(f'QEMU: additional parameter type {param[2]}'
-                                   ' not supported!')
+                    raise Exception(f'QEMU: additional parameter type "{param[2]}" not supported')
 
-        cmd_param_array = self.get_qemu_start_cmd_params_array(printer)
-
-        if cmd_param_array is None:
-            printer.print('could not create QEMU command line')
-            return None
+        cmd_param_array = self.get_qemu_start_cmd_params_array()
+        assert cmd_param_array is not None # should have created an exception
 
         if printer:
             printer.print(f'QEMU: {" ".join(cmd_param_array)}')
@@ -818,21 +808,15 @@ def get_qemu(target, printer=None):
     }
 
     if not target:
-        if printer:
-            printer.print('empty QEMU target')
-        return None
+        raise Exception('empty QEMU target')
 
     qemu_cfg = qemu_cfgs.get(target)
     if not qemu_cfg:
-        if printer:
-            printer.print(f'unsupported QEMU target: "{target}"')
-        return None
+        raise Exception(f'unsupported QEMU target: "{target}"')
 
     qemu_bin = qemu_cfg['qemu-bin'];
     if not qemu_bin:
-        if printer:
-            printer.print(f'no binary for QEMU target: "{target}"')
-        return None
+        raise Exception(f'no binary for QEMU target: "{target}"')
 
     if isinstance(qemu_bin, str):
         return QEMU_AppWrapper(qemu_cfg)
@@ -856,10 +840,7 @@ def get_qemu(target, printer=None):
         return qemu_bin
 
     # Don't know which QEMU to use.
-    if printer:
-        printer.print(f'unsupported binary for QEMU target: "{target}", "{qemu_bin}"')
-
-    return None
+    raise Exception(f'unsupported binary for QEMU target: "{target}", "{qemu_bin}"')
 
 
 #===============================================================================
@@ -959,7 +940,7 @@ class QemuProxyRunner():
         qemu = get_qemu(
                 target  = self.run_context.platform,
                 printer = self.get_printer())
-        assert qemu is not None
+        assert qemu is not None # this should have raised an exception
 
         # QEMU debug log: -d <option,option...> -D <logfile>
         #
@@ -1099,9 +1080,7 @@ class QemuProxyRunner():
                         additional_params = self.run_context.additional_params,
                         printer = self.get_printer(),
                         print_log = self.run_context.print_log)
-
-        if not qemu_proc:
-            raise Exception('could not start QEMU')
+        assert qemu_proc is not None # this should have raised an exception
         self.process_qemu = qemu_proc
 
         if self.run_context.print_log:
