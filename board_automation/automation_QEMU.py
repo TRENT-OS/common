@@ -765,7 +765,7 @@ def get_qemu(target, printer=None):
             'memory':   4096,
         },
         'zynqmp-qemu-xilinx': {
-            'qemu-bin': QEMU_zcu102, # this is really the class, not an instance
+            'wrapper-class': QEMU_zcu102,
             'memory':   4096,
         },
         'qemu-arm-virt-a15': {
@@ -825,33 +825,14 @@ def get_qemu(target, printer=None):
     if not qemu_cfg:
         raise Exception(f'unsupported QEMU target: "{target}"')
 
-    qemu_bin = qemu_cfg['qemu-bin'];
-    if not qemu_bin:
-        raise Exception(f'no binary for QEMU target: "{target}"')
+    # Get (and remove) the wrapper class from the config. Keeping if in the
+    # config bring no gain, because we create a instance of this class anyway
+    # and pass the remaining config to it.
+    wrapper_class = qemu_cfg.pop('wrapper-class', QEMU_AppWrapper)
+    assert wrapper_class is not None # this should have picked the default
 
-    if isinstance(qemu_bin, str):
-        return QEMU_AppWrapper(qemu_cfg)
-
-    # Instead of a string, a class reference can also be used. The actual
-    # instantiation only happens if this is also the target that the tests used.
-    # The try-except block is needed because issubclass() throws an exception if
-    # the parameter is not a class. Doing a check inspect.isclass() first could
-    # avoid the try-except.
-    try:
-        if issubclass(qemu_bin, QEMU_AppWrapper):
-            return qemu_bin()
-    except TypeError:
-        pass
-
-    # An instance can also be specified. However, adding instances to qemu_cfgs
-    # should be avoided because the instantiation will always happen, even if
-    # the tar is running for a different target and thus the instance is never
-    # used.
-    if isinstance(qemu_bin, QEMU_AppWrapper):
-        return qemu_bin
-
-    # Don't know which QEMU to use.
-    raise Exception(f'unsupported binary for QEMU target: "{target}", "{qemu_bin}"')
+    # return an instance of the wrapper
+    return wrapper_class(qemu_cfg)
 
 
 #===============================================================================
@@ -1038,7 +1019,7 @@ class QemuProxyRunner():
 
         # setup NICs
         if platform in [
-            'sabre', 
+            'sabre',
             'zynq7000',
         ]:
             # The Proxy uses tap1 to provide a network channel, so we use tap2
