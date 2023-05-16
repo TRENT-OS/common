@@ -828,7 +828,7 @@ def get_qemu(target, printer=None):
         return None
 
     qemu_bin = qemu_cfg['qemu-bin'];
-    if not qemu_cfg:
+    if not qemu_bin:
         if printer:
             printer.print(f'no binary for QEMU target: "{target}"')
         return None
