@@ -608,14 +608,14 @@ class QEMU_xilinx(QEMU_AppWrapper):
 
         super().__init__(
             {
-                'qemu-bin': '/host/qemu/xilinx-v2022.1/qemu-system-aarch64',
+                'qemu-bin': '/host/build-xilinx-qemu/qemu-system-aarch64',
                 'machine':  'arm-generic-fdt',
                 # Defaults are set, add or overwrite custom config.
                 **param_dict
             })
 
         self.qemu_pmu = QEMU_AppWrapper({
-            'qemu-bin': '/host/qemu/xilinx-v2022.1/qemu-system-microblazeel',
+            'qemu-bin': '/host/build-xilinx-qemu/qemu-system-microblazeel',
             'machine':  'microblaze-fdt',
         })
 
