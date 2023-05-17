@@ -987,11 +987,15 @@ class QemuProxyRunner():
         #qemu.add_params('-d', 'in_asm,exec,nochain') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
 
-        if self.run_context.platform in ['hifive',
-                                         'migv_qemu',
-                                         'qemu-riscv-virt64',
-                                         'qemu-riscv-virt32',
-                                        ]:
+        platform = self.run_context.platform
+        machine = qemu.get_machine()
+
+        if platform in [
+            'hifive',
+            'migv_qemu',
+            'qemu-riscv-virt64',
+            'qemu-riscv-virt32',
+        ]:
             qemu.config['bios'] = self.run_context.system_image
         else:
             # Seems older QEMU versions do not support the 'bios' parameter, so
@@ -1006,10 +1010,12 @@ class QemuProxyRunner():
         # data exchange. Others do it the other way around, UART_0 is available
         # for data exchange and UART_1 is used for the syslog.
         has_syslog_on_uart_1 = (1 == qemu.config['syslog-uart'])
-        has_data_uart = (self.run_context.platform in ['sabre',
-                                                       'zynq7000',
-                                                       'zynqmp',
-                                                       'hifive'])
+        has_data_uart = (platform in [
+                            'sabre',
+                            'zynq7000',
+                            'zynqmp',
+                            'hifive',
+                        ])
         assert 0 == len(qemu.config['serial_ports'])
         if not has_syslog_on_uart_1:
             # UART 0 is syslog
@@ -1036,18 +1042,21 @@ class QemuProxyRunner():
                 self.qemu_uart_log_port,
                 1)
 
-        if self.run_context.platform == 'sabre':
-            # QEMU sabre uses tap2 for the native networking support (not using
-            # the proxy)
+
+        # setup NICs
+        if platform == 'sabre':
+            # The Proxy uses tap1 to provide a network channel, so we use tap2
+            # here for the native networking.
             qemu.add_dev_nic_tap('tap2')
 
-        elif (qemu.get_machine() == 'virt') and qemu.config['cpu'].startswith('cortex-a'):
+        elif (machine == 'virt') and qemu.config['cpu'].startswith('cortex-a'):
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
             qemu.add_dev_nic_none()
 
-        # Platform setup (SD Card ...)
+
+        # setup SD Card
         if isinstance(qemu, QEMU_zcu102):
             # ZynqMP on the Xilinx-QEMU boots from a SD card, so the image must
             # be set up. There are 2 QEMU instances actually, thus some more
@@ -1057,10 +1066,21 @@ class QemuProxyRunner():
                     self.run_context.resource_dir,
                     'zcu102_sd_card'),
                 self.run_context.log_dir)
+
         elif self.run_context.sd_card_size and (self.run_context.sd_card_size > 0):
-            # SD card (might be ignored if target does not support this)
-            machine = qemu.get_machine()
-            if (machine in ['spike', 'sifive_u', 'mig-v', 'virt']):
+            # If the test framework is invoked with an SD card image, but the
+            # emulated machine does not support SD cards, we just ignore the
+            # SD card and continue, as the platform specific system might not
+            # need it and use some other storage instead. It might be better to
+            # fail here and refactor things, so the test gets a way to handle
+            # this, e.g. by setting a flag to ignore this parameter or just
+            # remove/clear the parameter.
+            if machine in [
+                'spike',
+                'sifive_u',
+                'mig-v',
+                'virt'
+            ]:
                 self.print(f'QEMU: ignoring SD card image, not supported for {machine}')
             else:
                 sd_card_image = os.path.join(self.run_context.log_dir, 'sdcard1.img')
@@ -1069,6 +1089,7 @@ class QemuProxyRunner():
                 with open(sd_card_image, 'wb') as f:
                     f.truncate(self.run_context.sd_card_size)
                 qemu.add_sdcard_from_image(sd_card_image)
+
 
         # start QEMU
         qemu_proc = qemu.start(
