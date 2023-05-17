@@ -467,8 +467,15 @@ class QEMU_AppWrapper:
             param = param[0]
         return param
 
+
     #---------------------------------------------------------------------------
-    def get_qemu_start_cmd_params_array(self):
+    def start(
+        self,
+        log_file_stdout,
+        log_file_stderr,
+        additional_params = None,
+        printer = None,
+        print_log = False):
 
         def check_param(cfg, name, alias=None, transform_fn=None):
             param = cfg.pop(name, None)
@@ -477,8 +484,15 @@ class QEMU_AppWrapper:
                 transform_fn(param) if transform_fn else param
             ]
 
-        cmd_arr = []
+        # Create a shallow copy of the configuration, so we can remove items
+        # that are turned into QEMU parameters. Any remaining item is unused
+        # configuration data, we remove the known elements and expect that the
+        # config is empty. If there are items left, raise an error, because
+        # these seem unsupported config parameters.
         cfg = self.config.copy()
+
+        # build the command line
+        cmd_arr = []
 
         param = cfg.pop('qemu-bin', None)
         if param is None:
@@ -542,25 +556,9 @@ class QEMU_AppWrapper:
         for p in param:
             cmd_arr += ['-serial', p if p else 'null']
 
-        # non-QEMU specific settings
-        param = cfg.pop('syslog-uart')
-        assert param in [0, 1]
-
-        if cfg:
-            raise Exception(f'unsupported QEMU config items: {cfg}')
-
-        return cmd_arr + self.raw_params
-
-
-    #---------------------------------------------------------------------------
-    def start(
-        self,
-        log_file_stdout,
-        log_file_stderr,
-        additional_params = None,
-        printer = None,
-        print_log = False):
-
+        # ToDo: Check if we still have to support this hack to pass additional
+        #       parameters to QEMU to load some data into its memory. There
+        #       should be a better way.
         if additional_params:
             for param in additional_params:
                 if param[2] == Additional_Param_Type.VALUE:
@@ -570,14 +568,21 @@ class QEMU_AppWrapper:
                 else:
                     raise Exception(f'QEMU: additional parameter type "{param[2]}" not supported')
 
-        cmd_param_array = self.get_qemu_start_cmd_params_array()
-        assert cmd_param_array is not None # should have created an exception
+        # non-QEMU specific settings
+        param = cfg.pop('syslog-uart')
+        assert param in [0, 1]
+
+        # now all parameters must have been processed
+        if cfg:
+            raise Exception(f'unsupported QEMU config items: {cfg}')
+
+        cmd_arr += self.raw_params
 
         if printer:
-            printer.print(f'QEMU: {" ".join(cmd_param_array)}')
+            printer.print(f'QEMU: {" ".join(cmd_arr)}')
 
         process = process_tools.ProcessWrapper(
-                    cmd_param_array,
+                    cmd_arr,
                     log_file_stdout = log_file_stdout,
                     log_file_stderr = log_file_stderr,
                     printer = printer,
