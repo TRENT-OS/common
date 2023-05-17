@@ -586,6 +586,7 @@ class QEMU_AppWrapper:
                     log_file_stderr = log_file_stderr,
                     printer = printer,
                     name = 'QEMU' )
+        assert process is not None # should have created an exception
 
         process.start(print_log)
 
