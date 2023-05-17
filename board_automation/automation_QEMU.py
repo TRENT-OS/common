@@ -563,9 +563,9 @@ class QEMU_AppWrapper:
 
         if additional_params:
             for param in additional_params:
-                if param[2] == self.Additional_Param_Type.VALUE:
+                if param[2] == Additional_Param_Type.VALUE:
                     self.init_memory_at(param[0], param[1])
-                elif param[2] == self.Additional_Param_Type.BINARY_IMG:
+                elif param[2] == Additional_Param_Type.BINARY_IMG:
                     self.load_blob(param[0], param[1])
                 else:
                     raise Exception(f'QEMU: additional parameter type "{param[2]}" not supported')
