@@ -352,20 +352,26 @@ class QEMU_AppWrapper:
 
 
     #---------------------------------------------------------------------------
-    def add_dev_nic_none(self):
-        # Any dummy NIC is just another device
-        self.add_device('nic', 'none', None)
+    def add_nic(self, nic_type, param_dict = None):
+        # We enforce an explicit NIC type. QEMU's default is 'user' if nothing
+        # is given, but callers should not rely on that. A 'user' NIC puts the
+        # emulated machine in network behind a NAT and shared the host's network
+        # connection. So TCP/UDP will works, but ICMP (ping) will not.
+        if nic_type is None:
+            raise Exception('No NIC type given')
+        # a NIC is just another device.
+        self.add_device('nic', nic_type, param_dict)
 
 
     #---------------------------------------------------------------------------
-    def add_dev_nic_tap(self, tap, param_dict = dict()):
+    def add_nic_tap(self, tap, param_dict = None):
         full_param_dict = {
             'ifname': tap,
             'script': 'no'
         }
-        full_param_dict.update(param_dict)
-        # Any TAP NIC is just another device
-        self.add_device('nic', 'tap', full_param_dict)
+        if param_dict:
+            full_param_dict.update(param_dict)
+        self.add_nic('tap', full_param_dict)
 
 
     #---------------------------------------------------------------------------
@@ -1029,13 +1035,13 @@ class QemuProxyRunner():
         if platform == 'sabre':
             # The Proxy uses tap1 to provide a network channel, so we use tap2
             # here for the native networking.
-            qemu.add_dev_nic_tap('tap2')
+            qemu.add_nic_tap('tap2')
 
         elif (machine == 'virt') and qemu.config['cpu'].startswith('cortex-a'):
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
             # "efi-virtio.rom".
-            qemu.add_dev_nic_none()
+            qemu.add_nic('none')
 
 
         # setup SD Card
