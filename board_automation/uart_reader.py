@@ -220,7 +220,7 @@ class UART_Reader():
     #---------------------------------------------------------------------------
     def start_monitor(self, log_file, print_log):
         assert self.port is not None
-        assert self.monitor_thread is None
+        assert not self.is_monitor_running()
         self.monitor_thread = threading.Thread(
             target = self.monitor_channel,
             args = (log_file, print_log)
