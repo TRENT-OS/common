@@ -133,6 +133,51 @@ class TTY_USB():
 #===============================================================================
 #===============================================================================
 
+class SerialSocketWrapper():
+
+    #---------------------------------------------------------------------------
+    def __init__(self, device, baudrate = 115200, read_timeout = None):
+        # When the parameter port is not 'None', it is immediately opened on
+        # object creation, no call to open() is necessary. The timeout is
+        # for reading, by default reads block forever until there is data.
+        self.port = serial.Serial(port     = device,
+                                  baudrate = baudrate,
+                                  bytesize = serial.serialutil.EIGHTBITS,
+                                  parity   = serial.serialutil.PARITY_NONE,
+                                  stopbits = serial.serialutil.STOPBITS_ONE,
+                                  timeout  = read_timeout
+                                  #xonxoff=False,
+                                  #rtscts=False,
+                                  #write_timeout=None,
+                                  #dsrdtr=False,
+                                  #inter_byte_timeout=None,
+                                  #exclusive=None
+                                 )
+
+
+    #---------------------------------------------------------------------------
+    def setsockopt(self, prot, opt, val):
+        print(f'ignore setsockopt: prot {prot}, opt {opt}, val {val}')
+
+
+    #---------------------------------------------------------------------------
+    def sendall(self, data):
+        #print(f'data len: {len(data)}')
+        #print(pyftdi.misc.hexdump(data))
+
+        if not self.port:
+            raise Exception('no port set')
+
+        if not self.port.is_open:
+            raise Exception('port is not open')
+
+        return self.port.write(data)
+
+
+
+#===============================================================================
+#===============================================================================
+
 class UART_Reader():
 
     #---------------------------------------------------------------------------
@@ -248,24 +293,11 @@ class UART_Reader():
         # port must not be open
         assert self.port is None
 
-        # When the port is not 'None', it is immediately opened on object
-        # creation, no call to open() is necessary.
-        # Using a timeout for reading prevents the monitoring thread from
-        # blocking forever. Instead, it reads nothing, can check if the port is
-        # still open and exit if not.
-        self.port = serial.Serial(port     = self.device,
-                                  baudrate = self.baud,
-                                  bytesize = serial.serialutil.EIGHTBITS,
-                                  parity   = serial.serialutil.PARITY_NONE,
-                                  stopbits = serial.serialutil.STOPBITS_ONE,
-                                  timeout  = 0.5,
-                                  #xonxoff=False,
-                                  #rtscts=False,
-                                  #write_timeout=None,
-                                  #dsrdtr=False,
-                                  #inter_byte_timeout=None,
-                                  #exclusive=None
-                                  )
+        w = SerialSocketWrapper(device = self.device,
+                                baudrate = self.baud,
+                                read_timeout = 0.5)
+        self.port = w.port
+
         if log_file or print_log:
             self.start_monitor(log_file, print_log)
 

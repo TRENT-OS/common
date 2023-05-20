@@ -149,10 +149,12 @@ class BoardRunner():
 
     #---------------------------------------------------------------------------
     def __init__(self, generic_runner):
-        self.data_uart = None
 
         self.generic_runner = generic_runner
         printer = generic_runner.run_context.printer
+
+        # Initialized when first used.
+        self.data_uart_socket = None
 
         # Get setup for a specific board. The generic_runner.run_context is
         # supposed to contain something that we can use here to pick the right
@@ -298,7 +300,7 @@ class BoardRunner():
     def stop(self):
         if self.board:
             self.board.stop()
-        self.data_uart = None
+        self.data_uart_socket = None
 
 
     #---------------------------------------------------------------------------
@@ -315,11 +317,12 @@ class BoardRunner():
         if self.generic_runner.is_proxy_running():
             raise Exception('ERROR: Proxy uses data UART')
 
-        if self.data_uart is None:
-            uart = self.board_setup.get_uart_data()
-            self.data_uart = SerialWrapper(uart.device, 115200, timeout=1)
+        if self.data_uart_socket is None:
+            uart = self.board.get_uart_data()
+            assert uart # if there was no exception, this must exist
+            self.data_uart_socket = uart_reader.SerialSocketWrapper(uart.device)
 
-        return self.data_uart
+        return self.data_uart_socket
 
 
 #===============================================================================
