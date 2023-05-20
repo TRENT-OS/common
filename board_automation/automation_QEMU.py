@@ -1035,6 +1035,21 @@ class QemuProxyRunner():
             # here for the native networking.
             qemu.add_nic_tap('tap2')
 
+        elif platform in [
+            'zynqmp',
+            'zynqmp-qemu-xilinx',
+        ]:
+            # There are 4 network ports (GEM0-3). In the zcu102 hardware, only
+            # GEM3 has a physical network port attached. There seem no way in
+            #QEMU to connect only GEM3, we have to connect GEM0-2 also. We can't
+            # use the 'none' type and must even give a proper model. That leaves
+            # now choice but make it a 'user' NIC then (which is the default
+            # that QEMU uses if no type is given).
+            qemu.add_nic('user', {'model': 'cadence_gem'})
+            qemu.add_nic('user', {'model': 'cadence_gem'})
+            qemu.add_nic('user', {'model': 'cadence_gem'})
+            qemu.add_nic_tap('tap2', {'model': "cadence_gem"})
+
         elif (machine == 'virt') and qemu.config['cpu'].startswith('cortex-a'):
             # Avoid an error message on the ARM virt platform that the
             # device "virtio-net-pci" init fails due to missing ROM file
