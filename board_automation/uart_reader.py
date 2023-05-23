@@ -133,6 +133,96 @@ class TTY_USB():
 #===============================================================================
 #===============================================================================
 
+class SerialSocketWrapper():
+
+    #---------------------------------------------------------------------------
+    def __init__(self, device, baudrate = 115200, read_timeout = None):
+
+        if not device:
+            raise Exception('no device set')
+
+        if not os.path.exists(device):
+            raise Exception(f'UART missing: {device}')
+
+        # When the parameter port is not 'None', it is immediately opened on
+        # object creation, no call to open() is necessary. The timeout is
+        # for reading, by default reads block forever until there is data.
+        ser = serial.Serial(
+                port     = None,
+                baudrate = baudrate,
+                bytesize = serial.serialutil.EIGHTBITS,
+                parity   = serial.serialutil.PARITY_NONE,
+                stopbits = serial.serialutil.STOPBITS_ONE,
+                timeout  = read_timeout
+                #xonxoff=False,
+                #rtscts=False,
+                #write_timeout=None,
+                #dsrdtr=False,
+                #inter_byte_timeout=None,
+                #exclusive=None
+        )
+        ser.port = device
+        self.ser = ser
+
+
+    #---------------------------------------------------------------------------
+    def open(self):
+        port = self.ser.port
+        assert port
+        if port.is_open:
+            raise Exception('port already open')
+        port.open()
+
+
+    #---------------------------------------------------------------------------
+    def close(self):
+        port = self.ser.port
+        assert port
+        if not port.is_open:
+            raise Exception('port not open')
+        port.close()
+
+
+    #---------------------------------------------------------------------------
+    def readline(self):
+        port = self.ser.port
+        assert port
+        if not port.is_open:
+            raise Exception('port not open')
+        # This will throw a SerialException if the port is in use by another
+        # process. We don't see any problem when opening the port, but here
+        # when doing a read access.
+        return port.readline()
+
+
+    #---------------------------------------------------------------------------
+    # Serial API emulation
+    def write(self, data)
+        port = self.ser.port
+        assert port
+        if not port.is_open:
+            raise Exception('port not open')
+        port.write(data)
+
+
+    #---------------------------------------------------------------------------
+    # Socket API emulation
+    def setsockopt(self, prot, opt, val):
+        print(f'ignore setsockopt: prot {prot}, opt {opt}, val {val}')
+
+
+    #---------------------------------------------------------------------------
+    # Socket API emulation
+    def sendall(self, data):
+        #print(f'data len: {len(data)}')
+        #print(pyftdi.misc.hexdump(data))
+        self.write(data)
+
+
+
+#===============================================================================
+#===============================================================================
+
 class UART_Reader():
 
     #---------------------------------------------------------------------------
@@ -146,14 +236,16 @@ class UART_Reader():
         if not os.path.exists(device):
             raise Exception(f'UART missing: {device}')
 
-        self.device  = device
-        self.baud    = baud
         self.printer = printer
         self.name    = name
 
-        self.port    = None
         self.monitor_thread = None
         self.stop_thread = False
+
+        self.serial = SerialSocketWrapper(
+                        device = device,
+                        baudrate = baud,
+                        read_timeout = 0.5)
 
 
     #---------------------------------------------------------------------------
@@ -169,13 +261,10 @@ class UART_Reader():
 
         while not self.stop_thread:
 
-            assert self.port is not None
-            assert self.port.is_open
-
             # This will throw a SerialException if the port is in use by another
             # process. We don't see any problem when opening the port, but here
             # when doing a read access.
-            line = self.port.readline()
+            line = self.serial.readline()
             if (len(line) == 0):
                 # readline() encountered a timeout
                 continue
@@ -219,8 +308,9 @@ class UART_Reader():
 
     #---------------------------------------------------------------------------
     def start_monitor(self, log_file, print_log):
-        assert self.port is not None
-        assert self.monitor_thread is None
+        assert not self.is_monitor_running()
+        assert self.serial is not None
+
         self.monitor_thread = threading.Thread(
             target = self.monitor_channel,
             args = (log_file, print_log)
@@ -245,27 +335,13 @@ class UART_Reader():
     #---------------------------------------------------------------------------
     def start(self, log_file = None, print_log = False):
 
-        # port must not be open
-        assert self.port is None
+        assert self.serial is not None
+        port = self.serial.port
+        assert port is not None
+        assert not port.is_open
 
-        # When the port is not 'None', it is immediately opened on object
-        # creation, no call to open() is necessary.
-        # Using a timeout for reading prevents the monitoring thread from
-        # blocking forever. Instead, it reads nothing, can check if the port is
-        # still open and exit if not.
-        self.port = serial.Serial(port     = self.device,
-                                  baudrate = self.baud,
-                                  bytesize = serial.serialutil.EIGHTBITS,
-                                  parity   = serial.serialutil.PARITY_NONE,
-                                  stopbits = serial.serialutil.STOPBITS_ONE,
-                                  timeout  = 0.5,
-                                  #xonxoff=False,
-                                  #rtscts=False,
-                                  #write_timeout=None,
-                                  #dsrdtr=False,
-                                  #inter_byte_timeout=None,
-                                  #exclusive=None
-                                  )
+        port.open()
+
         if log_file or print_log:
             self.start_monitor(log_file, print_log)
 
@@ -274,6 +350,7 @@ class UART_Reader():
     def stop(self):
         self.stop_monitor()
 
-        if self.port is not None:
-            self.port.close()
-            self.port = None
+        if self.serial is not None:
+            port = self.serial.port
+            if port and port.is_open
+                port.close()

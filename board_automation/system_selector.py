@@ -7,6 +7,7 @@ from . import automation_SabreLite
 from . import automation_RasPi
 from . import automation_zcu102
 from . import automation_OdroidC2
+from . import automation_JetsonTX2
 
 
 #-------------------------------------------------------------------------------
@@ -51,6 +52,9 @@ def get_test_runner(run_context):
         ],
         automation_OdroidC2: [
             'odroidc2',
+        ],
+        automation_JetsonTX2: [
+            'jetson-tx2-nx-a206',
         ],
     }
 
