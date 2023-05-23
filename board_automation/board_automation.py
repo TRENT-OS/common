@@ -227,6 +227,15 @@ class System_Runner():
     #---------------------------------------------------------------------------
     def stop(self):
 
+        # ToDo: Log checking and log printing are separate threads, where the
+        #       checker thread is usually "faster" than the printer thread.
+        #       Having a short short delay here is a hack to ensure all logs are
+        #       is printed. Increase  the value, if some logs are still missing.
+        #       A proper fix shgould synchronize the threads somehow, so at
+        #       least everything that was checked is also printed. A delay in
+        #       the end might still be needed, as there could be additional log
+        #       output that if worth showing.
+        time.sleep(0.2)
         self.get_system_log_line_reader().flush()
 
         if self.proxy:
