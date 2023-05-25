@@ -714,12 +714,17 @@ def get_qemu(target, printer=None):
 
     qemu_cfgs = {
         'sabre': {
-            'qemu-bin': '/host/qemu/build/qemu-system-arm',
-            # 'qemu-bin': '/opt/hc/bin/qemu-system-arm',
-            # 'qemu-bin': '/opt/hc/qemu-6.2.0/qemu-system-arm',
+            'qemu-bin': '/opt/hc/qemu-6.2.0/qemu-system-arm',
             'machine':  'sabrelite',
             'memory':   1024,
+            #'cores': 2, # up to 4 cores are supported
             'syslog-uart': 1, # kernel log is on UART1, not UART0
+            'raw_params': [
+                #'-singlestep',
+                #'--accel', 'tcg,thread=single',
+                '-d', 'cpu_reset,int,in_asm,exec,nochain,unimp,guest_errors',
+                '-D', '/ramdisk/qemu_log.txt',
+            ]
         },
         'migv_qemu': {
             'qemu-bin': '/opt/hc/migv/bin/qemu-system-riscv64',
@@ -773,15 +778,14 @@ def get_qemu(target, printer=None):
             'memory':   1024,
         },
         'zynq7000': {
-            'qemu-bin': '/host/qemu/build/qemu-system-arm',
-            # 'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-arm',
+            'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-arm',
             'machine':  'xilinx-zynq-a9',
             'memory':   1024,
             'syslog-uart': 1, # kernel log is on UART1, not UART0
+            'raw_params': ['--accel', 'tcg,thread=single']
         },
         'zynqmp': {
-            'qemu-bin': '/host/qemu/build/qemu-system-aarch64',
-            # 'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-aarch64',
+            'qemu-bin': '/opt/hc/qemu-7.1.0/qemu-system-aarch64',
             'machine':  ['xlnx-zcu102', {
                 'secure':         'off',
                 'virtualization': 'on',
@@ -984,6 +988,7 @@ class QemuProxyRunner():
         #qemu.add_params('-d', 'in_asm,nochain') # logged to stderr
         #qemu.add_params('-d', 'in_asm,exec,nochain') # logged to stderr
         #qemu.add_params('-D', 'qemu_log.txt')
+        #qemu.add_params('-D', '/ramdisk/qemu_log.txt')
 
         # specific setup
         qemu.setup(self.run_context)
@@ -994,6 +999,7 @@ class QemuProxyRunner():
         # Set default images
         if platform in [
             'hifive',
+            'spike64',
             'migv_qemu',
             'qemu-riscv-virt64',
             'qemu-riscv-virt32',
