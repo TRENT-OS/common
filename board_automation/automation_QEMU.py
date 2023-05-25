@@ -761,7 +761,10 @@ def get_qemu(target, printer=None):
         },
         'zynqmp': {
             'qemu-bin': 'qemu-system-aarch64',
-            'machine':  'xlnx-zcu102',
+            'machine':  ['xlnx-zcu102', {
+                'secure':         'off',
+                'virtualization': 'on',
+            }],
             'memory':   4096,
         },
         'zynqmp-qemu-xilinx': {
