@@ -46,16 +46,16 @@ class BoardSetup():
             # syslog is here
             'UART_AO_A': uart_reader.TTY_USB.find_device(
                 #serial    = '...',
-                usb_path  = '1-4.2.1.1.2'
+                usb_path  = '1-4.3.1.2'
             ),
-            'UART_A':  uart_reader.TTY_USB.find_device(
-                #serial    = '...',
-                usb_path  = '1-4.2.1.1.3'
-            ),
-            'UART_B': uart_reader.TTY_USB.find_device(
-                #serial    = '...',
-                usb_path  = '1-4.2.1.1.4'
-            )
+            #'UART_A':  uart_reader.TTY_USB.find_device(
+            #    #serial    = '...',
+            #    usb_path  = '1-4.2.1.1.3'
+            #),
+            # 'UART_B': uart_reader.TTY_USB.find_device(
+            #     #serial    = '...',
+            #     usb_path  = '1-4.2.1.1.4'
+            # )
         }
 
 
@@ -80,7 +80,8 @@ class BoardAutomation():
         self.monitors = []
 
         # create monitor for syslog UART and other UARTS that my print something
-        for uart_name in ['UART_AO_A', 'UART_A', 'UART_B']:
+        #for uart_name in ['UART_AO_A', 'UART_A', 'UART_B']:
+        for uart_name in ['UART_AO_A']:
             uart = self.board_setup.uarts[uart_name]
             assert uart # if there was no exception, this must exist
             self.monitors.append(
