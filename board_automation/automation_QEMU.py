@@ -998,6 +998,7 @@ class QemuProxyRunner():
                             'zynqmp',
                             'zynqmp-qemu-xilinx',
                             'hifive',
+                            'qemu-arm-virt-a53',
                         ])
         assert 0 == len(qemu.config['serial_ports'])
         if not has_syslog_on_uart_1:
