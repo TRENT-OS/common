@@ -8,6 +8,10 @@ from . import automation_RasPi
 from . import automation_RasPi4
 from . import automation_zcu102
 from . import automation_OdroidC2
+from . import automation_jetson_nano_two_gb
+from . import automation_jetson_tx2_nx_a206
+from . import automation_jetson_xavier_nx_dev_kit
+from . import automation_aetina_an110_xnx
 
 
 #-------------------------------------------------------------------------------
@@ -57,6 +61,18 @@ def get_test_runner(run_context):
         ],
         automation_OdroidC2: [
             'odroidc2',
+        ],
+        automation_jetson_nano_two_gb: [
+            'jetson-nano-2gb-dev-kit'
+        ],
+        automation_jetson_tx2_nx_a206: [
+            'jetson-tx2-nx-a206'
+        ],
+        automation_jetson_xavier_nx_dev_kit: [
+            'jetson-xavier-nx-dev-kit'
+        ],
+        automation_aetina_an110_xnx: [
+            'aetina-an110-xnx'
         ],
     }
 
