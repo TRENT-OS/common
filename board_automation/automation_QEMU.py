@@ -1017,6 +1017,8 @@ class QemuProxyRunner():
             assert 0 == len(qemu.serial_ports)
             qemu.add_serial_port('null')
 
+        if (platform == "qemu-arm-virt-a53"):
+            qemu.add_serial_port("pty")
         if has_syslog_on_uart_1:
             assert 1 == len(qemu.config['serial_ports'])
             # UART 1 is syslog
