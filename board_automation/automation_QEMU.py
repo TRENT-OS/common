@@ -1008,13 +1008,21 @@ class QemuProxyRunner():
                 self.qemu_uart_log_port,
                 0)
 
+        print("Temporary fix set has data uart to false")
+        has_data_uart = False
+
         if (has_data_uart):
+            print("HAS DATA UART!\n\n\n")
             # UART 0 or UART 1 is used for data
             qemu.add_serial_port(f'tcp:localhost:{self.qemu_uart_network_port},server')
         elif has_syslog_on_uart_1:
             # UART 0 must be a dummy in this case
             assert 0 == len(qemu.serial_ports)
             qemu.add_serial_port('null')
+
+        # This works data is received
+        qemu.add_serial_port(f"tcp:localhost:{7000},server=on,wait=off")
+        #qemu.add_serial_port("pty")
 
         if has_syslog_on_uart_1:
             assert 1 == len(qemu.config['serial_ports'])
