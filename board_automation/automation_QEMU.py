@@ -1015,10 +1015,10 @@ class QemuProxyRunner():
             print("HAS DATA UART!\n\n\n")
             # UART 0 or UART 1 is used for data
             qemu.add_serial_port(f'tcp:localhost:{self.qemu_uart_network_port},server')
-        elif has_syslog_on_uart_1:
-            # UART 0 must be a dummy in this case
-            assert 0 == len(qemu.serial_ports)
-            qemu.add_serial_port('null')
+        #elif has_syslog_on_uart_1:
+        #    # UART 0 must be a dummy in this case
+        #    assert 0 == len(qemu.serial_ports)
+        #    qemu.add_serial_port('null')
 
         # This works data is received
         qemu.add_serial_port(f"tcp:localhost:{7000},server=on,wait=off")
