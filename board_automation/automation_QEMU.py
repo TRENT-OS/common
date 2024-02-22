@@ -807,14 +807,14 @@ def get_qemu(target, printer=None):
             'memory':   2048,
         },
         'qemu-riscv-virt32': {
-            'qemu-bin': 'qemu-system-riscv32',
+            'qemu-bin': '/host/build/qemu-system-riscv32',
             'machine':  'virt',
             'cpu':      'rv32', # virt uses rv32gc
             'memory':   3072,
             'cores':    1, # virt supports up to 8 harts
         },
         'qemu-riscv-virt64': {
-            'qemu-bin': 'qemu-system-riscv64',
+            'qemu-bin': '/host/build/qemu-system-riscv64',
             'machine':  'virt',
             'cpu':      'rv64', # virt uses rv64gc
             'memory':   3072,
@@ -999,6 +999,7 @@ class QemuProxyRunner():
                             'zynqmp-qemu-xilinx',
                             'hifive',
                             'qemu-arm-virt-a53',
+                            'qemu-riscv-virt64',
                         ])
         assert 0 == len(qemu.config['serial_ports'])
         if not has_syslog_on_uart_1:
