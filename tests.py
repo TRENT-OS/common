@@ -1,4 +1,12 @@
 #
+# Copyright (C) 2020-2024, HENSOLDT Cyber GmbH
+# 
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# For commercial licensing, contact: info.cyber@hensoldt.net
+#
+
+#
 # This file is a candidate for deprecation. It contains convenience functions to
 # wrap things that were non-trivial once. However, the APIs have been improved,
 # so tests should implement the steps does in the wrapper function directly.
