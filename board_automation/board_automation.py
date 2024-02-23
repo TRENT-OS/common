@@ -77,7 +77,7 @@ class BootChecker:
         ret = log.find_matches_in_lines([
             # system has started, check that the ELF Loader started properly.
             # This can take some time depending on the board's boot process
-            ('ELF-loader started', 10),
+            ('ELF-loader started', 60),
             # give the ELF Loader 10 seconds to unpack the system. Some
             # platforms print "Jumping to kernel-image entry point..." when
             # ELF loader is done, but some don't. So all we can do is wait for
@@ -100,7 +100,7 @@ class BootChecker:
             # it takes some time for the CapDL Loader to set up the system,
             # especially if there is a lot of output on the UART, where the
             # baudrate setting slows things down. So let's give it 20 seconds.
-            ('CapDL Loader done, suspending...', 20),
+            ('CapDL Loader done, suspending...', 60),
         ])
         if not ret.ok:
             raise Exception(f'CapDL Loader string #{len(ret.items)-1} not found: {ret.get_missing()}')
