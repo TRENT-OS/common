@@ -125,7 +125,7 @@ class System_Runner():
         if run_context.system_image is None:
             raise Exception('ERROR: no system image given')
 
-        if not os.path.isfile(run_context.system_image):
+        if not os.path.isfile(pathlib.Path("../..") / run_context.system_image):
             raise Exception(f'ERROR: missing system image: {run_context.system_image}')
 
         self.run_context  = run_context
