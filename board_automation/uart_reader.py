@@ -14,6 +14,10 @@ import os
 import traceback
 import threading
 import datetime
+import time
+import base64
+import json
+import requests
 
 from . import tools
 
@@ -101,6 +105,7 @@ class TTY_USB():
     def find_device(self_or_cls, serial = None, usb_path = None):
 
         dev_list = self_or_cls.get_and_print_device_list()
+        print(dev_list)
 
         print(f'opening {usb_path}, {serial}')
 
@@ -108,15 +113,17 @@ class TTY_USB():
 
         if serial is not None:
             for dev in dev_list:
+                print(f"serial comparison: {dev.serial} : {serial}")
                 if (dev.serial == serial):
                     my_device = dev
-                    break;
+                    break
 
         elif usb_path is not None:
             for dev in dev_list:
+                print(f"serial comparison: {dev.usb_path} : {usb_path}")
                 if (dev.usb_path == usb_path):
                     my_device = dev
-                    break;
+                    break
 
         else:
             raise Exception('must specify device, serial and/or USB path')
@@ -148,7 +155,6 @@ class UART_Reader():
             self,
             device,
             baud = 115200,
-            name = 'UART',
             printer = None):
 
         if not os.path.exists(device):
@@ -157,7 +163,6 @@ class UART_Reader():
         self.device  = device
         self.baud    = baud
         self.printer = printer
-        self.name    = name
 
         self.port    = None
         self.monitor_thread = None
@@ -188,7 +193,7 @@ class UART_Reader():
                 # readline() encountered a timeout
                 continue
 
-            delta = datetime.datetime.now() - start;
+            delta = datetime.datetime.now() - start
 
             # We support raw plain single byte ASCII chars only, because they
             # can always be decoded as all 256 bit combinations are valid. For
@@ -285,3 +290,183 @@ class UART_Reader():
         if self.port is not None:
             self.port.close()
             self.port = None
+
+
+#===============================================================================
+#===============================================================================
+
+"""
+The UART_Proxy_Reader is part of the TRENTOS Harware CI.
+It reads uart data via a webapi from a UART proxy.
+"""
+class UART_Proxy_Reader():
+
+    #---------------------------------------------------------------------------
+    def __init__(
+            self,
+            device,
+            url,
+            baud = 115200,
+            name = 'UART',
+            printer = None):
+
+        
+
+        self.device  = device
+        self.baud    = baud
+        self.printer = printer
+        self.name    = name
+        self.url     = url
+
+        self.__check_device_api()
+
+        self.port    = None
+        self.monitor_thread = None
+        self.stop_thread = False
+
+
+    #---------------------------------------------------------------------------
+    def __check_device_api(self):
+        headers = {'accept': 'application/json'}
+        full_url = f"{self.url}/{self.device}/info"
+        response = requests.get(full_url, headers=headers)
+
+        if not response.ok:
+                raise Exception(f"Error {response.status_code}: {response.text}, device: {self.device}")
+
+        self.print(json.dumps(response.json(), indent=4))
+
+
+    #---------------------------------------------------------------------------
+    def __control_uart_reading_api(self, control):
+        headers = {'accept': 'application/json'}
+        full_url = f"{self.url}/{self.device}/uart/{control}"
+        response = requests.post(full_url, headers=headers)
+
+        if not response.ok:
+                raise Exception(f"Error {response.status_code}: {response.text}, device: {self.device}")
+        
+    
+    #---------------------------------------------------------------------------
+    def __start_uart_reading_api(self):
+        self.__control_uart_reading_api("start")
+
+
+    #---------------------------------------------------------------------------
+    def __stop_uart_reading_api(self):
+        self.__control_uart_reading_api("stop")
+
+
+    #---------------------------------------------------------------------------
+    def __readline_api(self):
+        headers = {'accept': 'application/text'}
+        full_url = f"{self.url}/{self.device}/uart/readline"
+
+        response = requests.get(full_url, headers=headers)
+
+        if response.status_code in [404, 412]:
+            raise Exception(f"Error {response.status_code}: Device {self.device}: {response.text}")
+
+        if response.status_code == 202:
+            time.sleep(0.5)
+            return ""
+        
+        if response.ok:
+            return base64.b64decode(response.text)
+        raise Exception(f"Error {response.status_code}: Device {self.device}: {response.text}")
+
+
+    #---------------------------------------------------------------------------
+    def print(self, msg):
+        if self.printer:
+            self.printer.print(msg)
+
+
+    #---------------------------------------------------------------------------
+    def monitor_channel_loop(self, f_log = None, print_log = False):
+
+        start = datetime.datetime.now()
+
+        while not self.stop_thread:
+            # This will throw a SerialException if the port is in use by another
+            # process. We don't see any problem when opening the port, but here
+            # when doing a read access.
+            line = self.__readline_api()
+            if not len(line):
+                # No data received
+                continue
+            
+
+            delta = datetime.datetime.now() - start
+
+            # We support raw plain single byte ASCII chars only, because they
+            # can always be decoded as all 256 bit combinations are valid. For
+            # the standard string UTF-8 encoding with multi-byte chars, certain
+            # bit pattern (e.g. from line garbage or transmission errors) would
+            # raise decoding errors because they are not valid.
+            # Remove any trailing '\r' or '\n'. Remove backspace chars, as we
+            # don't want to have the cursor move backwards on the screen. Could
+            # also print something like '<BACKSPACE>' instead
+            line_str = line.decode('latin_1').rstrip('\r\n').replace('\b', '')
+
+            if f_log is not None:
+                f_log.write(f'[{delta}] {line_str}{os.linesep}')
+                f_log.flush() # ensure things are really written
+
+            if print_log:
+                self.print(f'[{delta} {self.device}] {line_str}')
+
+
+    #---------------------------------------------------------------------------
+    def monitor_channel(self, log_file = None, print_log = False):
+
+        try:
+            if not log_file:
+                self.monitor_channel_loop(None, print_log)
+
+            else:
+                with open(log_file, "w") as f_log:
+                    self.monitor_channel_loop(f_log, print_log)
+
+        except Exception as e:
+            exc_info = sys.exc_info()
+            self.print(f'Exception: {e}')
+            traceback.print_exception(*exc_info)
+
+
+    #---------------------------------------------------------------------------
+    def start_monitor(self, log_file, print_log):
+        assert self.monitor_thread is None
+        self.monitor_thread = threading.Thread(
+            target = self.monitor_channel,
+            args = (log_file, print_log)
+        )
+        self.stop_thread = False
+        self.monitor_thread.start()
+
+
+    #---------------------------------------------------------------------------
+    def stop_monitor(self):
+        if self.monitor_thread is not None:
+            self.stop_thread = True
+            self.monitor_thread.join()
+            self.monitor_thread = None
+
+
+    #---------------------------------------------------------------------------
+    def is_monitor_running(self):
+        return self.monitor_thread is not None
+
+
+    #---------------------------------------------------------------------------
+    def start(self, log_file = None, print_log = False):
+        self.__start_uart_reading_api()
+
+        if log_file or print_log:
+            self.start_monitor(log_file, print_log)
+
+    #---------------------------------------------------------------------------
+    def stop(self):
+        self.stop_monitor()
+
+        self.__stop_uart_reading_api()
