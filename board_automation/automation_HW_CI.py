@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 #
-# Copyright (C) 2020-2024, HENSOLDT Cyber GmbH
+# Copyright (C) 2024, HENSOLDT Cyber GmbH
 # 
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -9,11 +9,18 @@
 #
 
 import time
+import requests
+import os
+import pathlib
+import shutil
 
 from . import tools
 from . import board_automation
-from . import automation_RasPi_boardSetup
+from . import automation_HW_CI_boardSetup
 
+
+URL          = "http://192.168.88.4:8000"
+TFTPBOOT_DIR = "/tftpboot/"
 
 #===============================================================================
 #===============================================================================
@@ -21,18 +28,14 @@ from . import automation_RasPi_boardSetup
 class Automation():
 
     #---------------------------------------------------------------------------
-    def __init__(self, relay_config, printer = None):
-
-        req_relays = ['POWER', 'notRUN', 'notPEN']
-        if not relay_config.check_relays_exist(req_relays):
-            raise Exception(
-                    'relay configuration invalid, need {}'.format(req_relays))
-
-        self.relay_config = relay_config;
+    def __init__(self, printer = None, hw_platform= None):
         self.printer      = printer
 
+        if hw_platform is None:
+            raise Exception("Error: No hardware platform specified")
+        
+        self.device = hw_platform
         # put all relays in a well defined state
-        self.relay_config.set_all_off()
 
 
     #---------------------------------------------------------------------------
@@ -41,34 +44,50 @@ class Automation():
             self.printer.print(msg)
 
 
+    def __toggle_power(self, mode):
+        if mode not in ["on", "off", "state"]:
+            raise Exception(f"Error: Unknown moder {mode} selected for toggling board power")
+        
+        headers = {'accept': 'application/json'}
+        full_url = f"{URL}/{self.device}/power/{mode}"
+        return requests.post(full_url, headers=headers)
+
     #---------------------------------------------------------------------------
     def power_on(self):
-        self.print('power on')
-        self.relay_config.POWER.prepare_state_on()
-        self.relay_config.notRUN.prepare_state_off()
-        self.relay_config.notPEN.prepare_state_off()
-        self.relay_config.apply_state()
+        self.print(f'power on {self.device}')
+        response = self.__toggle_power("on")
+        if not response.ok:
+            raise Exception(f"Error: Powering on device {self.device} failed: {response.status_code}: {response.text}")
 
 
     #---------------------------------------------------------------------------
     def power_off(self):
-        self.print('power off')
-        self.relay_config.POWER.set_off()
+        self.print(f'power off {self.device}')
+        response = self.__toggle_power("off")
+
+        if not response.ok:
+            raise Exception(f"Error: Powering on device {self.device} failed: {response.status_code}: {response.text}")
 
 
     #---------------------------------------------------------------------------
-    def power_disable(self):
-        self.print('power disable')
-        self.relay_config.notPEN.set_on()
-
-
-    #---------------------------------------------------------------------------
-    def reset(self, delay = 0.1):
+    def press_reset(self, delay = 0.1):
         self.print('reset')
-        self.relay_config.notRUN.set_on()
+        self.power_off()
         time.sleep(delay)
-        self.relay_config.notRUN.set_off()
+        self.power_on()
+        pass
 
+
+    #-------------------------------------------------------------------------------
+    def check_board_power_status(self):
+        response = self.__toggle_power("state")
+
+        if not response.ok:
+            raise Exception(f"Error: Powering on device {self.device} failed: {response.status_code}: {response.text}")
+
+        self.print(f"Power state of {self.device}: {response.text}")
+        return response.text == "auto-on"
+        
 
 #===============================================================================
 #===============================================================================
@@ -78,48 +97,53 @@ class BoardRunner():
     #---------------------------------------------------------------------------
     def __init__(self, generic_runner):
         self.generic_runner = generic_runner
+        self.device = self.generic_runner.run_context.platform.split("-")[0]
         printer = generic_runner.run_context.printer
-        self.board_setup = automation_RasPi_boardSetup.Board_Setup(printer)
-        self.board = Automation(self.board_setup.relay_config, printer)
+
+        self.board_setup = automation_HW_CI_boardSetup.Board_Setup(printer, self.device, URL)
+        self.board = Automation(printer, self.device)
 
 
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def cleanup(self):
         self.board_setup.cleanup()
+        os.remove(self.tftp_boot_file)
 
-
+    #---------------------------------------------------------------------------
+    def copy_tftp_boot_file(self):
+        system_image = pathlib.Path("../../") / self.generic_runner.run_context.system_image
+        if not os.path.exists(system_image):
+            raise Exception(f"Error: system_image not found at: {self.generic_runner.run_context.system_image}")
+        
+        self.tftp_boot_file= pathlib.Path(TFTPBOOT_DIR) / self.device / "os_image.elf"
+        shutil.copy2(system_image, self.tftp_boot_file)
+        print(f"Success: System_image deployed to {self.tftp_boot_file}")
+        
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def start(self):
 
-        # make sure the board is powered off
+        # make sure the board if powered off
         self.board.power_off()
         time.sleep(0.1)
 
         # This starts the proxy only if it was explicitly enabled, otherwise it
         # does nothing.
         #self.generic_runner.startProxy(
-        #    connection = f'UART:...',
+        #    connection = f'UART:{self.self.board_setup.uart1.device}',
         #    enable_tap = True,
         #)
 
-        # setup the SD card
-        mp = self.board_setup.sd_wire.switch_to_host_and_mount(timeout_sec = 5)
-
-        self.print('content of {}'.format(mp))
-        tools.print_files_from_folder(mp)
-
-        self.board_setup.sd_wire.copy_file_to_card(self.generic_runner.run_context.system_image)
-
-        self.board_setup.sd_wire.unmount_and_switch_to_device(timeout_sec = 5)
+        # Copy system image to tftpboot directory
+        self.copy_tftp_boot_file()
 
         # now the board is ready to boot, enable the UART logger and switch
         # the power on
-        self.board_setup.log_monitor.start(
-            log_file = self.generic_runner.run_context.system_log_file.name,
-            print_log = self.generic_runner.run_context.print_log)
 
+        self.board_setup.log_monitor.start(
+            log_file = self.generic_runner.system_log_file.name,
+            print_log = self.generic_runner.run_context.print_log)
         time.sleep(0.1)
 
         self.board.power_on()
@@ -134,7 +158,7 @@ class BoardRunner():
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def get_serial_socket(self):
-        raise Exception('not implemented')
+        return self.board_setup.uart1
 
 
 #===============================================================================

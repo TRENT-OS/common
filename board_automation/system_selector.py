@@ -20,7 +20,7 @@ from . import automation_jetson_nano_two_gb
 from . import automation_jetson_tx2_nx_a206
 from . import automation_jetson_xavier_nx_dev_kit
 from . import automation_aetina_an110_xnx
-
+from . import automation_HW_CI
 
 #-------------------------------------------------------------------------------
 def get_test_runner(run_context):
@@ -82,6 +82,9 @@ def get_test_runner(run_context):
         automation_aetina_an110_xnx: [
             'aetina-an110-xnx'
         ],
+        automation_HW_CI: [
+            'rpi3-ci',
+        ]
     }
 
     for (cls, lst) in boards.items():
