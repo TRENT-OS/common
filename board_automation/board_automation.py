@@ -90,7 +90,7 @@ class BootChecker:
             # platforms print "Jumping to kernel-image entry point..." when
             # ELF loader is done, but some don't. So all we can do is wait for
             # some kernel message here.
-            ('Bootstrapping kernel', 10),
+            ('Bootstrapping kernel', 30),
             # check if the seL4 kernel booted properly, 5 secs should be enough
             ('Booting all finished, dropped to user space', 5),
         ])
