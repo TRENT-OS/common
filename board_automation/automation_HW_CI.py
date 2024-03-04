@@ -20,7 +20,6 @@ from . import automation_HW_CI_boardSetup
 
 
 URL          = "http://192.168.88.4:8000"
-TFTPBOOT_DIR = "/tftpboot/"
 
 #===============================================================================
 #===============================================================================
@@ -46,7 +45,7 @@ class Automation():
 
     def __toggle_power(self, mode):
         if mode not in ["on", "off", "state"]:
-            raise Exception(f"Error: Unknown moder {mode} selected for toggling board power")
+            raise Exception(f"Error: Unknown mode {mode} selected for toggling board power")
         
         headers = {'accept': 'application/json'}
         full_url = f"{URL}/{self.device}/power/{mode}"
@@ -108,7 +107,10 @@ class BoardRunner():
     # called by generic_runner (board_automation.System_Runner)
     def cleanup(self):
         self.board_setup.cleanup()
-        os.remove(self.tftp_boot_file)
+        headers = {'accept': 'application/json'}
+        full_url = f"{URL}/{self.device}/tftp/delete"
+        requests.delete(full_url, headers=headers)
+            
 
     #---------------------------------------------------------------------------
     def copy_tftp_boot_file(self):
@@ -116,9 +118,13 @@ class BoardRunner():
         if not os.path.exists(system_image):
             raise Exception(f"Error: system_image not found at: {self.generic_runner.run_context.system_image}")
         
-        self.tftp_boot_file= pathlib.Path(TFTPBOOT_DIR) / self.device / "os_image.elf"
-        shutil.copy2(system_image, self.tftp_boot_file)
-        print(f"Success: System_image deployed to {self.tftp_boot_file}")
+        headers = {'accept': 'application/json'}
+        full_url = f"{URL}/{self.device}/tftp/upload"
+        file = {"file": open(system_image, "rb")}
+        req = requests.post(full_url, headers=headers, files=file)
+        if req.ok:
+            return print(f"Success: System_image deployed")
+        raise Exception(f"Error: Deployment of system image to proxy server failed with code {req.status_code}: {req.text}")
         
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
