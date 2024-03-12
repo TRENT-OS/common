@@ -13,6 +13,8 @@ import fcntl
 import dataclasses
 from . import tools
 
+# With out changing the architecture, this is the only way to keep state as the StreamLineReader class is a generator class.
+read_lines = []
 
 #===============================================================================
 #===============================================================================
@@ -118,6 +120,10 @@ class Stream_Line_Reader():
                     # lines with potentially useful data are more important for
                     # the caller than the timeouts for a few ms of timeout
                     # jitter.
+                    
+                    global read_lines
+                    read_lines.append(line)
+                    
                     return line
 
             # If we arrive here, we could not read a complete line. If there is
@@ -127,6 +133,9 @@ class Stream_Line_Reader():
             if not self.wait():
                 return line
 
+    #---------------------------------------------------------------------------
+    def get_read_lines(self):
+        return read_lines
 
     #---------------------------------------------------------------------------
     def flush(self):

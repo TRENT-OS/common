@@ -97,12 +97,11 @@ def check_test(test_runner, timeout, test_fn, test_args=None, single_thread=True
                 iteration_timeout = 0
 
         log.set_timeout(iteration_timeout)
+
         for line in log:
-            mo = assert_re.search(line)
-            if mo is not None:
-                pytest.fail(mo.group(1))
-            mo = result_re.search(line)
-            if mo is not None:
+            if assert_re.search(line):
+                pytest.fail(f"Assert for {failed_fn} found")
+            if result_re.search(line):
                 break
         else: # no break, we read all available lines and found no match
             if failed_fn:
@@ -114,3 +113,56 @@ def check_test(test_runner, timeout, test_fn, test_args=None, single_thread=True
                 pytest.fail(f'Timed out because {ret.match}')
 
             pytest.fail(f'Timed out but no assertion was found')
+
+#-------------------------------------------------------------------------------
+# Only use this function after the test has finished. It matches the whole log.
+def check_test_result(test_runner, test_fn, test_args=None):
+    string = f"!!! {test_fn}: OK\n"
+
+    generic_assert_re = re.compile(r'Assertion failed: @(.*)\((.*)\): (.*)')
+
+    test_name = test_fn if test_args is None else f'{test_fn}({test_args})'
+
+    result_re = re.compile(fr'!!! {re.escape(test_name)}: OK\n')
+    assert_re = re.compile(fr'Assertion failed: @{re.escape(test_name)}: (.*)\n')
+
+    complete_log = test_runner.get_system_log_line_reader().get_read_lines()
+
+    for line in complete_log:
+        if assert_re.search(line):
+            pytest.fail(f"Assert for {test_fn} found")
+        if result_re.search(line):
+            return
+
+
+#-------------------------------------------------------------------------------
+# Match a string in the live log.
+def find_string_to(test_runner, timeout, string, test_args=None):
+    __tracebackhide__ = True
+
+    log = test_runner.get_system_log_line_reader()
+    # The timeout is used multiple times, so ensure that a relative timeout
+    # works against a general deadline and does not restart each time it is
+    # used.
+    timeout = board_automation.tools.Timeout_Checker(timeout)
+
+    while 1:
+        iteration_timeout = timeout
+
+        log.set_timeout(iteration_timeout)
+
+        for line in log:
+            if string in line:
+                return
+        else: # no break, we read all available lines and found no match
+            pytest.fail(f'Timed out but no assertion was found')
+
+#-------------------------------------------------------------------------------
+# Use this function only after the test has finished. It matches the whole log.
+def find_string(test_runner, timeout, string, test_args=None):
+    log = test_runner.get_system_log_line_reader().get_read_lines()
+    
+    for line in log:
+        if string in line:
+            return
+    pytest.fail(f'String "{string}" not found in log')
