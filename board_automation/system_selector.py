@@ -5,6 +5,7 @@ from . import board_automation
 from . import automation_QEMU
 from . import automation_SabreLite
 from . import automation_RasPi
+from . import automation_RasPi4
 from . import automation_zcu102
 from . import automation_OdroidC2
 
@@ -46,6 +47,9 @@ def get_test_runner(run_context):
         ],
         automation_RasPi: [
             'rpi3',
+        ],
+        automation_RasPi4: [
+            'rpi4',
         ],
         automation_zcu102: [
             'migv',
