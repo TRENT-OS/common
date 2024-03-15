@@ -84,6 +84,9 @@ def get_test_runner(run_context):
         ],
         automation_HW_CI: [
             'rpi3-ci',
+            'rpi4-ci',
+            'odroidc2-ci',
+            'jetson-nano-2gb-dev-kit-ci',
         ]
     }
 
