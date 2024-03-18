@@ -96,7 +96,7 @@ class BoardRunner():
     #---------------------------------------------------------------------------
     def __init__(self, generic_runner):
         self.generic_runner = generic_runner
-        self.device = self.generic_runner.run_context.platform.split("-")[0]
+        self.device = "-".join(self.generic_runner.run_context.platform.split("-")[:-1])
         printer = generic_runner.run_context.printer
 
         self.board_setup = automation_HW_CI_boardSetup.Board_Setup(printer, self.device, URL)
