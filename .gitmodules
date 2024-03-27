@@ -1,0 +1,9 @@
+[submodule "board_automation/pyserial"]
+	path = board_automation/pyserial
+	url = ../pyserial.git
+[submodule "board_automation/pyusb"]
+	path = board_automation/pyusb
+	url = ../pyusb.git
+[submodule "board_automation/pyftdi"]
+	path = board_automation/pyftdi
+	url = ../pyftdi.git
