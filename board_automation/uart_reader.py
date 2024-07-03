@@ -349,12 +349,12 @@ class UART_Proxy_Reader():
     
     #---------------------------------------------------------------------------
     def __start_uart_reading_api(self):
-        self.__control_uart_reading_api("start")
+        self.__control_uart_reading_api("enable")
 
 
     #---------------------------------------------------------------------------
     def __stop_uart_reading_api(self):
-        self.__control_uart_reading_api("stop")
+        self.__control_uart_reading_api("disable")
 
 
     #---------------------------------------------------------------------------
