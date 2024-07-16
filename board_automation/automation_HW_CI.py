@@ -13,13 +13,19 @@ import requests
 import os
 import pathlib
 import shutil
+import websocket
+
+from collections import deque
 
 from . import tools
 from . import board_automation
 from . import automation_HW_CI_boardSetup
 
 
-URL          = "http://192.168.88.4:8000"
+
+ADDRESS      = "192.168.88.4"
+PORT         = "8000"
+URL          = f"http://{ADDRESS}:{PORT}"
 
 #===============================================================================
 #===============================================================================
@@ -161,11 +167,29 @@ class BoardRunner():
         self.board.power_off()
 
 
+    def __board_supports_data_uart(self):
+        url = f'{URL}/{self.device}/data_uart/available'
+        headers = { 'accept': 'application/json', }
+
+        return requests.get(url, headers=headers).json()
+
+
     #---------------------------------------------------------------------------
     # called by generic_runner (board_automation.System_Runner)
     def get_serial_socket(self):
-        return self.board_setup.uart1
+        def socket_abstraction(url):
+            ws = websocket.create_connection(url)
+            # send data as 64 byte chunks with 10ms delay to not overburden uart/proxy
+            ws.sendall = lambda data: [ (ws.send(data[i:i+64]), time.sleep(0.01)) for i in range(0, len(data), 64) ]
+            ws.recv_orig, ws.recv = ws.recv, lambda _: ws.recv_orig().encode("utf-8") # convert to bytes to align with socket recv
+            return ws
 
+        if not self.__board_supports_data_uart():
+            raise Exception('not implemented')
+        
+        url = f"ws://{ADDRESS}:{PORT}/{self.device}/data_uart/connect"
+        return socket_abstraction(url)
+    
 
 #===============================================================================
 #===============================================================================
