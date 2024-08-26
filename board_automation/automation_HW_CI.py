@@ -23,7 +23,7 @@ from . import automation_HW_CI_boardSetup
 
 
 
-ADDRESS      = "192.168.88.4"
+ADDRESS      = "10.178.169.36"
 PORT         = "8000"
 URL          = f"http://{ADDRESS}:{PORT}"
 
