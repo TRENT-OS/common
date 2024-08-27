@@ -86,6 +86,8 @@ def get_test_runner(run_context):
             'rpi3-ci',
             'rpi4-ci',
             'odroidc2-ci',
+            'sabre-ci',
+            'nitrogen6sx-ci',
             'jetson-nano-2gb-dev-kit-ci',
         ]
     }
