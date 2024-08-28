@@ -179,9 +179,9 @@ class BoardRunner():
     def get_serial_socket(self):
         def socket_abstraction(url):
             ws = websocket.create_connection(url)
+            
             # send data as 64 byte chunks with 10ms delay to not overburden uart/proxy
-            ws.sendall = lambda data: [ (ws.send(data[i:i+64]), time.sleep(0.01)) for i in range(0, len(data), 64) ]
-            ws.recv_orig, ws.recv = ws.recv, lambda _: ws.recv_orig().encode("utf-8") # convert to bytes to align with socket recv
+            ws.sendall = lambda data: [ (ws.send_binary(data[i:i+64]), time.sleep(0.01)) for i in range(0, len(data), 64) ]
             return ws
 
         if not self.__board_supports_data_uart():
