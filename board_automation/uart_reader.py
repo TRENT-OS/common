@@ -368,7 +368,7 @@ class UART_Proxy_Reader():
             raise Exception(f"Error {response.status_code}: Device {self.device}: {response.text}")
 
         if response.status_code == 202:
-            time.sleep(0.5)
+            time.sleep(1)
             return ""
         
         if response.ok:
