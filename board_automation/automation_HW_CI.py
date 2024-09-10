@@ -97,7 +97,7 @@ class Automation():
 #===============================================================================
 #===============================================================================
 
-class BoardRunner():
+class CIBoardRunner():
 
     #---------------------------------------------------------------------------
     def __init__(self, generic_runner):
@@ -180,6 +180,10 @@ class BoardRunner():
         def socket_abstraction(url):
             ws = websocket.create_connection(url)
             
+            # we do not take a buffer size here, so just ignore it
+            ws.__recv = ws.recv
+            ws.recv = lambda size: ws.__recv()
+
             # send data as 64 byte chunks with 10ms delay to not overburden uart/proxy
             ws.sendall = lambda data: [ (ws.send_binary(data[i:i+64]), time.sleep(0.01)) for i in range(0, len(data), 64) ]
             return ws
@@ -196,4 +200,4 @@ class BoardRunner():
 
 #-------------------------------------------------------------------------------
 def get_BoardRunner(generic_runner):
-    return BoardRunner(generic_runner)
+    return CIBoardRunner(generic_runner)
